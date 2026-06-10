@@ -9,6 +9,16 @@ class RoadConditionSummary(BaseModel):
     reported_at: datetime
 
 
+class RoadCondition(BaseModel):
+    id: int
+    road_id: int
+    status: str
+    details: str | None
+    data_source: str
+    is_verified: bool
+    reported_at: datetime
+
+
 class Road(BaseModel):
     id: int
     resort_id: int | None

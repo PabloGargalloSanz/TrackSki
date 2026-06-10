@@ -35,3 +35,50 @@ def get_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
     )
 
     return [dict(row) for row in result.mappings()]
+
+
+def get_road_by_id(db: Session, road_id: int) -> dict | None:
+    result = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                resort_id,
+                name,
+                ST_AsGeoJSON(route)::json AS route,
+                data_source,
+                is_verified
+            FROM roads
+            WHERE id = :road_id
+            """
+        ),
+        {"road_id": road_id},
+    )
+
+    row = result.mappings().one_or_none()
+    return dict(row) if row else None
+
+
+def get_latest_road_condition_by_road_id(db: Session, road_id: int) -> dict | None:
+    result = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                road_id,
+                status,
+                details,
+                data_source,
+                is_verified,
+                reported_at
+            FROM road_conditions
+            WHERE road_id = :road_id
+            ORDER BY reported_at DESC, id DESC
+            LIMIT 1
+            """
+        ),
+        {"road_id": road_id},
+    )
+
+    row = result.mappings().one_or_none()
+    return dict(row) if row else None
