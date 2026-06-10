@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories.resorts import get_resort_by_id, get_resorts
+from app.repositories.snow_reports import get_latest_snow_report_by_resort_id
 from app.schemas.resort import Coordinates, Resort
+from app.schemas.snow_report import SnowReport, TrailStatus
 
 router = APIRouter()
 
@@ -23,6 +25,40 @@ def serialize_resort(row: dict) -> Resort:
     )
 
 
+def serialize_snow_report(row: dict) -> SnowReport:
+    return SnowReport(
+        id=row["id"],
+        resort_id=row["resort_id"],
+        open_lifts=row["open_lifts"],
+        total_lifts=row["total_lifts"],
+        open_km=row["open_km"],
+        total_km=row["total_km"],
+        snow_depth_min_cm=row["snow_depth_min_cm"],
+        snow_depth_max_cm=row["snow_depth_max_cm"],
+        avalanche_risk=row["avalanche_risk"],
+        access_status=row["access_status"],
+        green_trails=TrailStatus(
+            open=row["open_green_trails"],
+            total=row["total_green_trails"],
+        ),
+        blue_trails=TrailStatus(
+            open=row["open_blue_trails"],
+            total=row["total_blue_trails"],
+        ),
+        red_trails=TrailStatus(
+            open=row["open_red_trails"],
+            total=row["total_red_trails"],
+        ),
+        black_trails=TrailStatus(
+            open=row["open_black_trails"],
+            total=row["total_black_trails"],
+        ),
+        data_source=row["data_source"],
+        is_verified=row["is_verified"],
+        reported_at=row["reported_at"],
+    )
+
+
 @router.get("", response_model=list[Resort])
 def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
     return [serialize_resort(row) for row in get_resorts(db)]
@@ -38,3 +74,25 @@ def retrieve_resort(resort_id: int, db: Session = Depends(get_db)) -> Resort:
         )
 
     return serialize_resort(resort)
+
+
+@router.get("/{resort_id}/snow-reports/latest", response_model=SnowReport)
+def retrieve_latest_snow_report(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> SnowReport:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    snow_report = get_latest_snow_report_by_resort_id(db, resort_id)
+    if not snow_report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Snow report not found",
+        )
+
+    return serialize_snow_report(snow_report)
