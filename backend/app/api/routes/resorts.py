@@ -1,17 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories.roads import get_roads_by_resort_id
 from app.repositories.resorts import get_resort_by_id, get_resorts
-from app.repositories.snow_reports import get_latest_snow_report_by_resort_id
-from app.repositories.weather_reports import get_latest_weather_report_by_resort_id
+from app.repositories.snow_reports import (
+    get_latest_snow_report_by_resort_id,
+    get_snow_reports_by_resort_id,
+)
+from app.repositories.weather_reports import (
+    get_latest_weather_report_by_resort_id,
+    get_weather_reports_by_resort_id,
+)
 from app.schemas.road import Road, RoadConditionSummary
 from app.schemas.resort import Coordinates, Resort
 from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_report import WeatherReport
 
 router = APIRouter()
+ReportLimit = Annotated[int, Query(ge=1, le=100)]
 
 
 def serialize_resort(row: dict) -> Resort:
@@ -138,6 +147,25 @@ def retrieve_latest_snow_report(
     return serialize_snow_report(snow_report)
 
 
+@router.get("/{resort_id}/snow-reports", response_model=list[SnowReport])
+def list_snow_reports(
+    resort_id: int,
+    limit: ReportLimit = 20,
+    db: Session = Depends(get_db),
+) -> list[SnowReport]:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return [
+        serialize_snow_report(row)
+        for row in get_snow_reports_by_resort_id(db, resort_id, limit)
+    ]
+
+
 @router.get("/{resort_id}/weather/latest", response_model=WeatherReport)
 def retrieve_latest_weather_report(
     resort_id: int,
@@ -158,6 +186,25 @@ def retrieve_latest_weather_report(
         )
 
     return serialize_weather_report(weather_report)
+
+
+@router.get("/{resort_id}/weather", response_model=list[WeatherReport])
+def list_weather_reports(
+    resort_id: int,
+    limit: ReportLimit = 20,
+    db: Session = Depends(get_db),
+) -> list[WeatherReport]:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return [
+        serialize_weather_report(row)
+        for row in get_weather_reports_by_resort_id(db, resort_id, limit)
+    ]
 
 
 @router.get("/{resort_id}/roads", response_model=list[Road])
