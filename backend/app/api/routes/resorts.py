@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.repositories.resorts import get_resort_by_id, get_resorts
 from app.repositories.snow_reports import get_latest_snow_report_by_resort_id
+from app.repositories.weather_reports import get_latest_weather_report_by_resort_id
 from app.schemas.resort import Coordinates, Resort
 from app.schemas.snow_report import SnowReport, TrailStatus
+from app.schemas.weather_report import WeatherReport
 
 router = APIRouter()
 
@@ -59,6 +61,22 @@ def serialize_snow_report(row: dict) -> SnowReport:
     )
 
 
+def serialize_weather_report(row: dict) -> WeatherReport:
+    return WeatherReport(
+        id=row["id"],
+        resort_id=row["resort_id"],
+        temperature_celsius=row["temperature_celsius"],
+        wind_speed_kmh=row["wind_speed_kmh"],
+        wind_direction=row["wind_direction"],
+        precipitation_mm=row["precipitation_mm"],
+        visibility_m=row["visibility_m"],
+        weather=row["weather"],
+        data_source=row["data_source"],
+        is_verified=row["is_verified"],
+        reported_at=row["reported_at"],
+    )
+
+
 @router.get("", response_model=list[Resort])
 def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
     return [serialize_resort(row) for row in get_resorts(db)]
@@ -96,3 +114,25 @@ def retrieve_latest_snow_report(
         )
 
     return serialize_snow_report(snow_report)
+
+
+@router.get("/{resort_id}/weather/latest", response_model=WeatherReport)
+def retrieve_latest_weather_report(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> WeatherReport:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    weather_report = get_latest_weather_report_by_resort_id(db, resort_id)
+    if not weather_report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Weather report not found",
+        )
+
+    return serialize_weather_report(weather_report)
