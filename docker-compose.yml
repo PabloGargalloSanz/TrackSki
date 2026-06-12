@@ -1,32 +1,11 @@
 services:
-  api:
-    build:
-      context: ./backend
-    container_name: trackski-api
-    restart: unless-stopped
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DATABASE_URL: postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-    ports:
-      - "${API_PORT}:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-
   db:
     image: postgis/postgis:16-3.4
-    container_name: trackski-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/db/init:/docker-entrypoint-initdb.d:ro
@@ -35,6 +14,70 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DATABASE_URL: ${DATABASE_URL}
+      BACKEND_PORT: ${API_PORT}
+    expose:
+      - "${API_PORT}"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.${APP_ENV}-backend.rule=Host(`${APP_HOST}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.${APP_ENV}-backend.entrypoints=web"
+      - "traefik.http.routers.${APP_ENV}-backend.priority=100"
+      - "traefik.http.routers.${APP_ENV}-backend.middlewares=${TRAEFIK_BACKEND_MIDDLEWARES}"
+      - "traefik.http.services.${APP_ENV}-backend.loadbalancer.server.port=${API_PORT}"
+      - "traefik.http.middlewares.${APP_ENV}-api-strip.stripprefix.prefixes=/api"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      INTERNAL_API_URL: ${INTERNAL_API_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      FRONTEND_CONTAINER_PORT: ${FRONTEND_CONTAINER_PORT}
+      PORT: ${FRONTEND_CONTAINER_PORT}
+    expose:
+      - "${FRONTEND_CONTAINER_PORT}"
+    depends_on:
+      - backend
+    networks:
+      - internal
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.${APP_ENV}-frontend.rule=Host(`${APP_HOST}`)"
+      - "traefik.http.routers.${APP_ENV}-frontend.entrypoints=web"
+      - "traefik.http.routers.${APP_ENV}-frontend.priority=1"
+      - "traefik.http.routers.${APP_ENV}-frontend.middlewares=${TRAEFIK_FRONTEND_MIDDLEWARES}"
+      - "traefik.http.services.${APP_ENV}-frontend.loadbalancer.server.port=${FRONTEND_CONTAINER_PORT}"
+      - "traefik.http.middlewares.${APP_ENV}-frontend-headers.headers.customrequestheaders.X-Forwarded-Proto=http"
+
+networks:
+  internal:
+    internal: true
+  proxy:
+    external: true
 
 volumes:
   postgres_data:
