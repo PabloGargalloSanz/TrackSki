@@ -40,8 +40,5 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Local notes
-prueba.md
-
 # Docker local overrides
 docker-compose.override.yml
