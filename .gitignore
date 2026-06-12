@@ -1,7 +1,47 @@
+# Environment files
 .env
+.env.local
+.env.staging
+.env.main
+
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
 .venv/
 venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+.vercel/
+coverage/
+
+# pnpm
+.pnpm-store/
+pnpm-debug.log*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local notes
 prueba.md
+
+# Docker local overrides
+docker-compose.override.yml
