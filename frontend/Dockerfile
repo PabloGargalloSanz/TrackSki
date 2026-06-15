@@ -7,6 +7,7 @@ RUN if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm ins
 FROM node:22-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV DOCKER_BUILD=true
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
