@@ -1,7 +1,12 @@
 import unittest
 from datetime import datetime, timezone
+from io import BytesIO
+from zipfile import ZipFile
 
-from app.services.weather.alerts import read_aemet_alerts
+from app.services.weather.alerts import (
+    read_aemet_alert_package,
+    read_aemet_alerts,
+)
 
 CAP_ALERT = b"""<?xml version="1.0" encoding="UTF-8"?>
 <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
@@ -48,6 +53,19 @@ class AemetAlertsTest(unittest.TestCase):
             datetime(2026, 6, 15, 12, tzinfo=timezone.utc),
         )
         self.assertEqual(alerts[0].source, "aemet")
+
+    def test_reads_all_xml_alerts_from_zip_package(self) -> None:
+        buffer = BytesIO()
+        with ZipFile(buffer, "w") as archive:
+            archive.writestr("first-alert.xml", CAP_ALERT)
+            archive.writestr("second-alert.XML", CAP_ALERT)
+            archive.writestr("readme.txt", "ignored")
+
+        alerts = read_aemet_alert_package(buffer.getvalue())
+
+        self.assertEqual(len(alerts), 2)
+        self.assertTrue(all(alert.level == "naranja" for alert in alerts))
+
 
 if __name__ == "__main__":
     unittest.main()
