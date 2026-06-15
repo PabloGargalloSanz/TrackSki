@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 from io import BytesIO
+from tarfile import open as open_tar
 from zipfile import ZipFile
 
 from app.services.weather.alerts import (
@@ -65,6 +66,20 @@ class AemetAlertsTest(unittest.TestCase):
 
         self.assertEqual(len(alerts), 2)
         self.assertTrue(all(alert.level == "naranja" for alert in alerts))
+
+    def test_reads_all_xml_alerts_from_tar_package(self) -> None:
+        buffer = BytesIO()
+        with open_tar(fileobj=buffer, mode="w") as archive:
+            document = BytesIO(CAP_ALERT)
+            info = archive.tarinfo()
+            info.name = "alert.xml"
+            info.size = len(CAP_ALERT)
+            archive.addfile(info, document)
+
+        alerts = read_aemet_alert_package(buffer.getvalue())
+
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0].event, "Nevadas")
 
 
 if __name__ == "__main__":

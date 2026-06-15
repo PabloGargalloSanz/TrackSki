@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
-from zipfile import ZipFile
+from tarfile import ReadError, open as open_tar
+from zipfile import ZipFile, is_zipfile
 from xml.etree import ElementTree
 
 CAP_NAMESPACE = "urn:oasis:names:tc:emergency:cap:1.2"
@@ -58,12 +59,24 @@ def read_aemet_alerts(document: bytes) -> list[WeatherAlert]:
 def read_aemet_alert_package(package: bytes) -> list[WeatherAlert]:
     alerts: list[WeatherAlert] = []
 
-    with ZipFile(BytesIO(package)) as archive:
-        for name in archive.namelist():
-            if name.lower().endswith(".xml"):
-                alerts.extend(read_aemet_alerts(archive.read(name)))
+    if is_zipfile(BytesIO(package)):
+        with ZipFile(BytesIO(package)) as archive:
+            for name in archive.namelist():
+                if name.lower().endswith(".xml"):
+                    alerts.extend(read_aemet_alerts(archive.read(name)))
+        return alerts
 
-    return alerts
+    try:
+        with open_tar(fileobj=BytesIO(package), mode="r:*") as archive:
+            for member in archive.getmembers():
+                if member.isfile() and member.name.lower().endswith(".xml"):
+                    document = archive.extractfile(member)
+                    if document:
+                        alerts.extend(read_aemet_alerts(document.read()))
+        return alerts
+    except ReadError:
+        return read_aemet_alerts(package)
+
 
 
 def _preferred_info(root: ElementTree.Element) -> ElementTree.Element:
