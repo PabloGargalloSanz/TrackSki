@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     DB_USER: str 
     DB_PASSWORD: str 
     DATABASE_URL: str | None = None
+    AEMET_API_KEY: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",

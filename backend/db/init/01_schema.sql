@@ -83,9 +83,33 @@ CREATE TABLE IF NOT EXISTS weather_reports (
     reported_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS weather_alerts (
+    id SERIAL PRIMARY KEY,
+    identifier VARCHAR(255) NOT NULL,
+    level VARCHAR(20) NOT NULL,
+    event VARCHAR(120) NOT NULL,
+    area VARCHAR(255) NOT NULL,
+    onset TIMESTAMP WITH TIME ZONE,
+    expires TIMESTAMP WITH TIME ZONE,
+    headline TEXT,
+    description TEXT,
+    instruction TEXT,
+    data_source VARCHAR(100) NOT NULL DEFAULT 'aemet',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_weather_alerts_identifier_area UNIQUE (identifier, area),
+    CONSTRAINT chk_weather_alerts_level CHECK (
+        level IN ('verde', 'amarillo', 'naranja', 'rojo', 'desconocido')
+    ),
+    CONSTRAINT chk_weather_alerts_dates CHECK (
+        onset IS NULL OR expires IS NULL OR onset <= expires
+    )
+);
+
 CREATE INDEX IF NOT EXISTS idx_ski_resorts_location ON ski_resorts USING GIST(location);
 CREATE INDEX IF NOT EXISTS idx_roads_route ON roads USING GIST(route);
 CREATE INDEX IF NOT EXISTS idx_roads_resort_id ON roads(resort_id);
 CREATE INDEX IF NOT EXISTS idx_road_conditions_road_reported_at ON road_conditions(road_id, reported_at DESC);
 CREATE INDEX IF NOT EXISTS idx_snow_reports_resort_reported_at ON snow_reports(resort_id, reported_at DESC);
 CREATE INDEX IF NOT EXISTS idx_weather_reports_resort_reported_at ON weather_reports(resort_id, reported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_weather_alerts_expires ON weather_alerts(expires);
+CREATE INDEX IF NOT EXISTS idx_weather_alerts_area ON weather_alerts(area);
