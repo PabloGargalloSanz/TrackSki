@@ -44,7 +44,8 @@ services:
       - "traefik.http.routers.${APP_ENV}-backend.rule=Host(`${APP_HOST}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.${APP_ENV}-backend.entrypoints=web"
       - "traefik.http.routers.${APP_ENV}-backend.priority=100"
-      - "traefik.http.routers.${APP_ENV}-backend.middlewares=${TRAEFIK_BACKEND_MIDDLEWARES}"
+      - "traefik.http.routers.${APP_ENV}-backend.middlewares=${APP_ENV}-api-strip,${TRAEFIK_BACKEND_MIDDLEWARES}"
+      - "traefik.http.middlewares.${APP_ENV}-api-strip.stripprefix.prefixes=/api"
 
       - "traefik.http.services.${APP_ENV}-backend.loadbalancer.server.port=${API_PORT}"
 
@@ -71,7 +72,8 @@ services:
       - "traefik.http.routers.${APP_ENV}-frontend.rule=Host(`${APP_HOST}`)"
       - "traefik.http.routers.${APP_ENV}-frontend.entrypoints=web"
       - "traefik.http.routers.${APP_ENV}-frontend.priority=1"
-      - "traefik.http.routers.${APP_ENV}-frontend.middlewares=${TRAEFIK_FRONTEND_MIDDLEWARES}"
+      - "traefik.http.routers.${APP_ENV}-frontend.middlewares=${APP_ENV}-frontend-strip,${TRAEFIK_FRONTEND_MIDDLEWARES}"
+      - "traefik.http.middlewares.${APP_ENV}-frontend-strip.stripprefix.prefixes=/"
 
       - "traefik.http.services.${APP_ENV}-frontend.loadbalancer.server.port=${FRONTEND_CONTAINER_PORT}"
 
