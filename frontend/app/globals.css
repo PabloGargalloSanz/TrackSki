@@ -77,6 +77,27 @@ h1 {
   padding: 20px;
 }
 
+.resort-card {
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.resort-card:hover {
+  border-color: #8bbab5;
+  box-shadow: 0 8px 20px rgb(22 32 42 / 8%);
+  transform: translateY(-2px);
+}
+
+.resort-card:focus-visible,
+.back-link:focus-visible {
+  outline: 3px solid #99d5cf;
+  outline-offset: 3px;
+}
+
 .resort-card__header {
   display: flex;
   align-items: flex-start;
@@ -138,6 +159,138 @@ h1 {
   margin-top: 24px;
 }
 
+.back-link {
+  display: inline-block;
+  margin-bottom: 24px;
+  color: var(--accent-strong);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #d9e2ea;
+}
+
+.detail-header .lead {
+  margin-top: 10px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.detail-section {
+  background: var(--surface);
+  border: 1px solid #d9e2ea;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e3e9ee;
+}
+
+.section-heading h2,
+.road-row h3 {
+  margin: 0;
+}
+
+.section-heading h2 {
+  font-size: 20px;
+}
+
+.section-heading time,
+.road-status time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric-grid,
+.trail-grid {
+  display: grid;
+  gap: 16px;
+  margin: 18px 0 0;
+}
+
+.metric-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.trail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding-top: 18px;
+  border-top: 1px solid #e3e9ee;
+}
+
+.metric-grid dt,
+.trail-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric-grid dd,
+.trail-grid dd {
+  margin: 5px 0 0;
+  font-weight: 700;
+}
+
+.roads-section {
+  margin-top: 16px;
+}
+
+.road-list {
+  display: grid;
+}
+
+.road-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 0;
+  border-bottom: 1px solid #e3e9ee;
+}
+
+.road-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.road-row h3 {
+  font-size: 17px;
+}
+
+.road-row p,
+.empty-message {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.road-status {
+  display: grid;
+  flex: none;
+  gap: 5px;
+  text-align: right;
+}
+
 @media (max-width: 680px) {
   .page {
     padding: 32px 16px 48px;
@@ -147,6 +300,28 @@ h1 {
     align-items: flex-start;
     flex-direction: column;
     gap: 14px;
+  }
+
+  .detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .road-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .road-status {
+    text-align: left;
   }
 
   h1 {
