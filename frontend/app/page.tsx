@@ -1,19 +1,76 @@
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+import { getResorts, type Resort } from "../lib/api";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  let resorts: Resort[] = [];
+  let hasError = false;
+
+  try {
+    resorts = await getResorts();
+  } catch {
+    hasError = true;
+  }
+
   return (
     <main className="page">
-      <section className="hero">
-        <p className="eyebrow">TrackSki</p>
-        <h1>Estado de nieve, meteo y accesos desde una sola vista.</h1>
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">TrackSki</p>
+          <h1>Estaciones</h1>
+        </div>
         <p className="lead">
-          Frontend SSR con Next.js preparado para consumir la API en{" "}
-          <code>{apiUrl}</code>.
+          Consulta el estado de nieve, meteorologia y accesos de cada estacion.
         </p>
-        <a className="button" href={`${apiUrl}/health`}>
-          Comprobar API
-        </a>
-      </section>
+      </header>
+
+      {hasError ? (
+        <section className="status-panel" role="alert">
+          <h2>No se pudieron cargar las estaciones</h2>
+          <p>Comprueba que la API este disponible e intentalo de nuevo.</p>
+        </section>
+      ) : resorts.length === 0 ? (
+        <section className="status-panel">
+          <h2>No hay estaciones disponibles</h2>
+          <p>Las estaciones apareceran aqui cuando existan datos.</p>
+        </section>
+      ) : (
+        <section className="resort-grid" aria-label="Listado de estaciones">
+          {resorts.map((resort) => (
+            <article className="resort-card" key={resort.id}>
+              <div className="resort-card__header">
+                <div>
+                  <h2>{resort.name}</h2>
+                  <p>
+                    {resort.region ? `${resort.region}, ` : ""}
+                    {resort.country}
+                  </p>
+                </div>
+                <span
+                  className={
+                    resort.is_verified
+                      ? "data-badge data-badge--verified"
+                      : "data-badge"
+                  }
+                >
+                  {resort.is_verified ? "Verificado" : "Datos de prueba"}
+                </span>
+              </div>
+
+              <dl className="coordinates">
+                <div>
+                  <dt>Latitud</dt>
+                  <dd>{resort.location.latitude.toFixed(4)}</dd>
+                </div>
+                <div>
+                  <dt>Longitud</dt>
+                  <dd>{resort.location.longitude.toFixed(4)}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </section>
+      )}
     </main>
   );
 }

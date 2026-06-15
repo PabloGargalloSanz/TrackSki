@@ -26,17 +26,18 @@ body {
 
 .page {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 32px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 48px 24px 64px;
 }
 
-.hero {
-  width: min(760px, 100%);
-  background: var(--surface);
-  border: 1px solid #d9e2ea;
-  border-radius: 8px;
-  padding: 32px;
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #d9e2ea;
 }
 
 .eyebrow {
@@ -49,37 +50,106 @@ body {
 
 h1 {
   margin: 0;
-  max-width: 680px;
   font-size: 40px;
   line-height: 1.08;
 }
 
 .lead {
-  max-width: 620px;
-  margin: 18px 0 0;
+  max-width: 520px;
+  margin: 0;
   color: var(--muted);
-  font-size: 18px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
-code {
+.resort-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.resort-card,
+.status-panel {
+  background: var(--surface);
+  border: 1px solid #d9e2ea;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.resort-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.resort-card h2,
+.status-panel h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.resort-card p,
+.status-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.data-badge {
+  flex: none;
+  padding: 5px 8px;
+  border: 1px solid #d3a72c;
+  border-radius: 4px;
+  color: #765b0a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.data-badge--verified {
+  border-color: #59a99f;
   color: var(--accent-strong);
+}
+
+.coordinates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0 0;
+}
+
+.coordinates div {
+  padding-top: 12px;
+  border-top: 1px solid #e3e9ee;
+}
+
+.coordinates dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.coordinates dd {
+  margin: 4px 0 0;
   font-weight: 700;
 }
 
-.button {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  margin-top: 28px;
-  padding: 0 18px;
-  border-radius: 6px;
-  background: var(--accent);
-  color: white;
-  font-weight: 700;
-  text-decoration: none;
+.status-panel {
+  margin-top: 24px;
 }
 
-.button:hover {
-  background: var(--accent-strong);
+@media (max-width: 680px) {
+  .page {
+    padding: 32px 16px 48px;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  h1 {
+    font-size: 34px;
+  }
 }
