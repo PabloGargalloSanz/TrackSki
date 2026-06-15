@@ -8,6 +8,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.VERSION,
+        root_path="/api",
     )
 
     @app.get("/", tags=["root"])
@@ -15,8 +16,8 @@ def create_app() -> FastAPI:
         return {
             "name": settings.PROJECT_NAME,
             "version": settings.VERSION,
-            "docs": "/docs",
-            "health": "/health",
+            "docs": "/api/docs",
+            "health": "/api/health",
         }
 
     app.include_router(health.router, prefix="/health", tags=["health"])
