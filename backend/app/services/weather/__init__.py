@@ -1,6 +1,7 @@
 from app.services.weather.aemet import AemetClient
 from app.services.weather.alerts import (
     WeatherAlert,
+    is_actionable_alert,
     read_aemet_alert_package,
     read_aemet_alerts,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "OpenMeteoProvider",
     "WeatherAlert",
     "WeatherObservation",
+    "is_actionable_alert",
     "read_aemet_alert_package",
     "read_aemet_alerts",
 ]

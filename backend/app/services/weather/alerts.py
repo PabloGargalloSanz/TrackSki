@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from tarfile import ReadError, open as open_tar
 from zipfile import ZipFile, is_zipfile
@@ -14,6 +14,7 @@ SEVERITY_LEVELS = {
     "Severe": "naranja",
     "Extreme": "rojo",
 }
+ACTIONABLE_LEVELS = {"amarillo", "naranja", "rojo"}
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,17 @@ class WeatherAlert:
     description: str | None
     instruction: str | None
     source: str = "aemet"
+
+
+def is_actionable_alert(
+    alert: WeatherAlert,
+    now: datetime | None = None,
+) -> bool:
+    reference_time = now or datetime.now(timezone.utc)
+    return (
+        alert.level in ACTIONABLE_LEVELS
+        and (alert.expires is None or alert.expires > reference_time)
+    )
 
 
 def read_aemet_alerts(document: bytes) -> list[WeatherAlert]:

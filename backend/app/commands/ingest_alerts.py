@@ -10,6 +10,7 @@ from app.db.session import SessionLocal
 from app.repositories.weather_alerts import save_weather_alert
 from app.services.weather import (
     AemetClient,
+    is_actionable_alert,
     read_aemet_alert_package,
 )
 
@@ -36,7 +37,10 @@ def main() -> int:
     try:
         with AemetClient(settings.AEMET_API_KEY) as client:
             package = client.get_latest_alerts(args.area)
-        alerts = read_aemet_alert_package(package)
+        downloaded_alerts = read_aemet_alert_package(package)
+        alerts = [
+            alert for alert in downloaded_alerts if is_actionable_alert(alert)
+        ]
     except (httpx.HTTPError, BadZipFile, ParseError, ValueError) as error:
         print(f"ERROR: no se pudieron obtener los avisos: {error}", file=sys.stderr)
         return 1
@@ -52,7 +56,10 @@ def main() -> int:
     finally:
         db.close()
 
-    print(f"OK: guardados {len(alerts)} avisos de AEMET para el area {args.area}.")
+    print(
+        f"OK: guardados {len(alerts)} de {len(downloaded_alerts)} avisos "
+        f"de AEMET para el area {args.area}."
+    )
     return 0
 
 

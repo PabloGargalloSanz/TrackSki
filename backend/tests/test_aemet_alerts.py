@@ -5,6 +5,8 @@ from tarfile import open as open_tar
 from zipfile import ZipFile
 
 from app.services.weather.alerts import (
+    WeatherAlert,
+    is_actionable_alert,
     read_aemet_alert_package,
     read_aemet_alerts,
 )
@@ -80,6 +82,46 @@ class AemetAlertsTest(unittest.TestCase):
 
         self.assertEqual(len(alerts), 1)
         self.assertEqual(alerts[0].event, "Nevadas")
+
+    def test_keeps_only_active_warning_levels(self) -> None:
+        now = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+        active = WeatherAlert(
+            "active",
+            "naranja",
+            "Nevadas",
+            "Pirineo",
+            now,
+            datetime(2026, 6, 15, 18, tzinfo=timezone.utc),
+            None,
+            None,
+            None,
+        )
+        expired = WeatherAlert(
+            "expired",
+            "rojo",
+            "Nevadas",
+            "Pirineo",
+            now,
+            datetime(2026, 6, 15, 11, tzinfo=timezone.utc),
+            None,
+            None,
+            None,
+        )
+        green = WeatherAlert(
+            "green",
+            "verde",
+            "Nevadas",
+            "Pirineo",
+            now,
+            datetime(2026, 6, 15, 18, tzinfo=timezone.utc),
+            None,
+            None,
+            None,
+        )
+
+        self.assertTrue(is_actionable_alert(active, now))
+        self.assertFalse(is_actionable_alert(expired, now))
+        self.assertFalse(is_actionable_alert(green, now))
 
 
 if __name__ == "__main__":
