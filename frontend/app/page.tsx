@@ -8,7 +8,8 @@ export default async function Home() {
 
   try {
     resorts = await getResorts();
-  } catch {
+  } catch (error) {
+    console.error("No se pudieron cargar las estaciones desde la API:", error);
     hasError = true;
   }
 
