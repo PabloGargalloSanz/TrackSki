@@ -16,6 +16,7 @@ from app.repositories.weather_reports import (
 )
 from app.schemas.road import Road, RoadConditionSummary
 from app.schemas.resort import Coordinates, Resort
+from app.schemas.resort_summary import ResortSummary
 from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_report import WeatherReport
 
@@ -123,6 +124,34 @@ def retrieve_resort(resort_id: int, db: Session = Depends(get_db)) -> Resort:
         )
 
     return serialize_resort(resort)
+
+
+@router.get("/{resort_id}/summary", response_model=ResortSummary)
+def retrieve_resort_summary(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> ResortSummary:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    snow_report = get_latest_snow_report_by_resort_id(db, resort_id)
+    weather_report = get_latest_weather_report_by_resort_id(db, resort_id)
+    roads = get_roads_by_resort_id(db, resort_id)
+
+    return ResortSummary(
+        resort=serialize_resort(resort),
+        latest_snow_report=(
+            serialize_snow_report(snow_report) if snow_report else None
+        ),
+        latest_weather_report=(
+            serialize_weather_report(weather_report) if weather_report else None
+        ),
+        roads=[serialize_road(row) for row in roads],
+    )
 
 
 @router.get("/{resort_id}/snow-reports/latest", response_model=SnowReport)
