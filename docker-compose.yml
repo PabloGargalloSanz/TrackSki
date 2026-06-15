@@ -40,12 +40,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
+
       - "traefik.http.routers.${APP_ENV}-backend.rule=Host(`${APP_HOST}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.${APP_ENV}-backend.entrypoints=web"
       - "traefik.http.routers.${APP_ENV}-backend.priority=100"
       - "traefik.http.routers.${APP_ENV}-backend.middlewares=${TRAEFIK_BACKEND_MIDDLEWARES}"
+
       - "traefik.http.services.${APP_ENV}-backend.loadbalancer.server.port=${API_PORT}"
-      - "traefik.http.middlewares.${APP_ENV}-api-strip.stripprefix.prefixes=/api"
 
   frontend:
     build:
@@ -66,12 +67,13 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
+
       - "traefik.http.routers.${APP_ENV}-frontend.rule=Host(`${APP_HOST}`)"
       - "traefik.http.routers.${APP_ENV}-frontend.entrypoints=web"
       - "traefik.http.routers.${APP_ENV}-frontend.priority=1"
       - "traefik.http.routers.${APP_ENV}-frontend.middlewares=${TRAEFIK_FRONTEND_MIDDLEWARES}"
+
       - "traefik.http.services.${APP_ENV}-frontend.loadbalancer.server.port=${FRONTEND_CONTAINER_PORT}"
-      - "traefik.http.middlewares.${APP_ENV}-frontend-headers.headers.customrequestheaders.X-Forwarded-Proto=http"
 
 networks:
   internal:

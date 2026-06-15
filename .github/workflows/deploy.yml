@@ -19,12 +19,12 @@ jobs:
           set -e
 
           if [ "${GITHUB_REF_NAME}" = "staging" ]; then
-            echo "app_dir=/opt/miapp/staging" >> "$GITHUB_OUTPUT"
-            echo "project_name=miapp_staging" >> "$GITHUB_OUTPUT"
+            echo "app_dir=/home/pablo/proyectos/trackski/staging" >> "$GITHUB_OUTPUT"
+            echo "project_name=trackski_staging" >> "$GITHUB_OUTPUT"
             echo "branch=staging" >> "$GITHUB_OUTPUT"
           elif [ "${GITHUB_REF_NAME}" = "main" ]; then
-            echo "app_dir=/opt/miapp/main" >> "$GITHUB_OUTPUT"
-            echo "project_name=miapp_main" >> "$GITHUB_OUTPUT"
+            echo "app_dir=/home/pablo/proyectos/trackski/main" >> "$GITHUB_OUTPUT"
+            echo "project_name=trackski_main" >> "$GITHUB_OUTPUT"
             echo "branch=main" >> "$GITHUB_OUTPUT"
           else
             echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
@@ -46,9 +46,12 @@ jobs:
             BRANCH="${{ steps.target.outputs.branch }}"
 
             cd "$APP_DIR"
+
             git fetch origin "$BRANCH"
             git reset --hard "origin/$BRANCH"
 
             docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
+
             docker compose --env-file .env -p "$PROJECT_NAME" up -d --build
+
             docker image prune -f
