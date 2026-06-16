@@ -11,6 +11,13 @@ ACCESS_ROLE_PRIORITY = {
     "secondary": 4,
     "alternative": 5,
 }
+ROAD_CONDITION_STATUS_PRIORITY = {
+    "closed": 1,
+    "chains": 2,
+    "affected": 3,
+    "caution": 4,
+    "unknown": 5,
+}
 
 
 def km_ranges_overlap(
@@ -74,3 +81,41 @@ def most_relevant_access_role(access_roads: list[dict]) -> str | None:
         (access_road["access_role"] for access_road in access_roads),
         key=lambda access_role: ACCESS_ROLE_PRIORITY.get(access_role, 99),
     )
+
+
+def road_condition_status_from_incidents(incidents: list[dict]) -> str | None:
+    if not incidents:
+        return None
+
+    statuses = [_road_condition_status_from_incident(incident) for incident in incidents]
+    return min(
+        statuses,
+        key=lambda status: ROAD_CONDITION_STATUS_PRIORITY.get(status, 99),
+    )
+
+
+def _road_condition_status_from_incident(incident: dict) -> str:
+    incident_type = incident.get("incident_type")
+    severity = incident.get("severity")
+
+    if incident_type == "road_closed" and severity in CRITICAL_SEVERITIES:
+        return "closed"
+    if incident_type == "chains_required":
+        return "chains"
+    if incident_type in {
+        "snow",
+        "ice",
+        "weather",
+        "restriction",
+        "roadworks",
+        "accident",
+        "congestion",
+        "obstruction",
+    }:
+        return "affected" if severity in CRITICAL_SEVERITIES else "caution"
+    if severity in CRITICAL_SEVERITIES:
+        return "affected"
+    if severity in CAUTION_SEVERITIES:
+        return "caution"
+
+    return "unknown"

@@ -5,6 +5,7 @@ from app.services.road_access import (
     km_ranges_overlap,
     most_relevant_access_role,
     overall_access_status,
+    road_condition_status_from_incidents,
 )
 
 
@@ -113,6 +114,36 @@ class RoadAccessTest(unittest.TestCase):
             "final_access",
         )
         self.assertIsNone(most_relevant_access_role([]))
+
+    def test_road_condition_status_from_incidents(self) -> None:
+        self.assertIsNone(road_condition_status_from_incidents([]))
+        self.assertEqual(
+            road_condition_status_from_incidents(
+                [
+                    {"incident_type": "road_closed", "severity": "critical"},
+                    {"incident_type": "chains_required", "severity": "high"},
+                ]
+            ),
+            "closed",
+        )
+        self.assertEqual(
+            road_condition_status_from_incidents(
+                [{"incident_type": "chains_required", "severity": "medium"}]
+            ),
+            "chains",
+        )
+        self.assertEqual(
+            road_condition_status_from_incidents(
+                [{"incident_type": "snow", "severity": "medium"}]
+            ),
+            "caution",
+        )
+        self.assertEqual(
+            road_condition_status_from_incidents(
+                [{"incident_type": "accident", "severity": "high"}]
+            ),
+            "affected",
+        )
 
 
 if __name__ == "__main__":
