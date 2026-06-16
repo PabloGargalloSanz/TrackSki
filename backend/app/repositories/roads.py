@@ -88,3 +88,45 @@ def get_latest_road_condition_by_road_id(db: Session, road_id: int) -> dict | No
 
     row = result.mappings().one_or_none()
     return dict(row) if row else None
+
+
+def get_active_road_incidents(db: Session) -> list[dict]:
+    result = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                road_id,
+                source,
+                road_code,
+                title,
+                description,
+                incident_type,
+                status,
+                severity,
+                start_km,
+                end_km,
+                direction,
+                ST_AsGeoJSON(location)::json AS location,
+                ST_AsGeoJSON(affected_route)::json AS affected_route,
+                starts_at,
+                ends_at,
+                reported_at,
+                updated_at
+            FROM road_incidents
+            WHERE status IN ('active', 'planned')
+            ORDER BY
+                CASE severity
+                    WHEN 'critical' THEN 1
+                    WHEN 'high' THEN 2
+                    WHEN 'medium' THEN 3
+                    WHEN 'low' THEN 4
+                    ELSE 5
+                END,
+                updated_at DESC,
+                id DESC
+            """
+        )
+    )
+
+    return [dict(row) for row in result.mappings()]
