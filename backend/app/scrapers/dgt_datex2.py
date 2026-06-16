@@ -25,6 +25,16 @@ KM_RANGE_PATTERN = re.compile(
     r"(?:\s*(?:-|al|a|hasta|y)\s*(\d+(?:[,.]\d+)?))?",
     re.IGNORECASE,
 )
+ISO_DATETIME_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
+TECHNICAL_DESCRIPTION_TERMS = {
+    "certain",
+    "dgt3.0",
+    "nonlinkedpoint",
+    "positive",
+    "negative",
+    "vehicleobstruction",
+    "vehiclestuck",
+}
 
 
 @dataclass(frozen=True)
@@ -194,8 +204,12 @@ def parse_datex2_incidents(xml_content: str | bytes) -> list[NormalizedRoadIncid
 
     for record in _find_situation_records(root):
         description = _extract_description(record)
+        search_text = _extract_search_text(record)
         raw_type = _extract_raw_type(record)
-        incident_type = normalize_incident_type(raw_type, description)
+        incident_type = normalize_incident_type(
+            raw_type,
+            f"{description or ''} {search_text}",
+        )
         status = normalize_status(
             _find_first_text(
                 record,
@@ -207,8 +221,8 @@ def parse_datex2_incidents(xml_content: str | bytes) -> list[NormalizedRoadIncid
             incident_type,
             description,
         )
-        road_code = extract_road_code(description)
-        start_km, end_km = extract_km_range(description)
+        road_code = extract_road_code(f"{description or ''} {search_text}")
+        start_km, end_km = extract_km_range(f"{description or ''} {search_text}")
         starts_at = _parse_datetime(
             _find_first_text(record, {"overallStartTime", "validityStartTime"})
         )
@@ -250,6 +264,7 @@ def parse_datex2_incidents(xml_content: str | bytes) -> list[NormalizedRoadIncid
                     "source_id": source_id,
                     "raw_type": raw_type,
                     "text": description,
+                    "search_text": search_text,
                 },
             )
         )
@@ -297,15 +312,36 @@ def _extract_description(element: ElementTree.Element) -> str | None:
         element,
         {"value", "comment", "description", "situationRecordDescription"},
     )
-    if preferred:
+    if preferred and _looks_like_public_description(preferred):
         return preferred
 
+    return None
+
+
+def _looks_like_public_description(value: str) -> bool:
+    text = normalize_text(value)
+    if not text:
+        return False
+
+    if len(ISO_DATETIME_PATTERN.findall(value)) >= 2:
+        return False
+
+    technical_matches = {
+        term for term in TECHNICAL_DESCRIPTION_TERMS if term in text
+    }
+    if len(technical_matches) >= 2:
+        return False
+
+    return True
+
+
+def _extract_search_text(element: ElementTree.Element) -> str:
     text_parts = [
         child.text.strip()
         for child in element.iter()
         if child.text and child.text.strip()
     ]
-    return " ".join(text_parts) if text_parts else None
+    return " ".join(text_parts)
 
 
 def _extract_raw_type(element: ElementTree.Element) -> str | None:

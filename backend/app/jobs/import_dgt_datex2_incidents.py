@@ -20,7 +20,7 @@ class ImportSummary:
     saved: int = 0
     skipped: int = 0
     roads_matched: int = 0
-    roads_unmatched: int = 0
+    roads_unmatched_skipped: int = 0
 
 
 def save_dgt_incidents(
@@ -34,15 +34,16 @@ def save_dgt_incidents(
             summary.skipped += 1
             continue
 
-        road_id = None
-        if incident.road_code:
-            road_id = get_best_road_id_by_code(db, incident.road_code)
+        if not incident.road_code:
+            summary.skipped += 1
+            continue
 
-        if road_id:
-            summary.roads_matched += 1
-        else:
-            summary.roads_unmatched += 1
+        road_id = get_best_road_id_by_code(db, incident.road_code)
+        if not road_id:
+            summary.roads_unmatched_skipped += 1
+            continue
 
+        summary.roads_matched += 1
         upsert_road_incident(db, incident, road_id=road_id)
         summary.saved += 1
 
@@ -76,7 +77,7 @@ def main() -> int:
         f"saved={summary.saved}, "
         f"skipped={summary.skipped}, "
         f"roads_matched={summary.roads_matched}, "
-        f"roads_unmatched={summary.roads_unmatched}"
+        f"roads_unmatched_skipped={summary.roads_unmatched_skipped}"
     )
     return 0
 

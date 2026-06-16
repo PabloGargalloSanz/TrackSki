@@ -140,6 +140,50 @@ class DgtDatex2NormalizationTest(unittest.TestCase):
         self.assertIsNotNone(incident.reported_at)
         self.assertIsNotNone(incident.updated_at)
 
+    def test_parse_datex2_incident_without_public_description(self) -> None:
+        xml = """
+        <d2:payload xmlns:d2="http://datex2.eu/schema/3/common">
+          <d2:situationRecord id="record-2">
+            <d2:validityStatus>active</d2:validityStatus>
+            <d2:severity>low</d2:severity>
+            <d2:roadIdentifier>N-400</d2:roadIdentifier>
+            <d2:latitude>41.772926</d2:latitude>
+            <d2:longitude>-4.620479</d2:longitude>
+          </d2:situationRecord>
+        </d2:payload>
+        """
+
+        incidents = parse_datex2_incidents(xml)
+
+        self.assertEqual(len(incidents), 1)
+        incident = incidents[0]
+        self.assertEqual(incident.road_code, "N-400")
+        self.assertIsNone(incident.description)
+        self.assertIn("N-400", incident.raw_payload["search_text"])
+
+    def test_parse_datex2_ignores_technical_description_dump(self) -> None:
+        technical_description = (
+            "GRU_2026-9369290_9 2026-06-16T11:09:45.000+02:00 "
+            "2026-06-16T11:09:45.000+02:00 certain DGT3.0 active "
+            "vehicleObstruction vehicleStuck CV-655 eastBound nonLinkedPoint "
+            "38.79487 -0.7064533 Comunitat Valenciana positive incident"
+        )
+        xml = f"""
+        <d2:payload xmlns:d2="http://datex2.eu/schema/3/common">
+          <d2:situationRecord id="record-3">
+            <d2:value>{technical_description}</d2:value>
+          </d2:situationRecord>
+        </d2:payload>
+        """
+
+        incidents = parse_datex2_incidents(xml)
+
+        self.assertEqual(len(incidents), 1)
+        incident = incidents[0]
+        self.assertEqual(incident.road_code, "CV-655")
+        self.assertIsNone(incident.description)
+        self.assertIn("CV-655", incident.raw_payload["search_text"])
+
 
 if __name__ == "__main__":
     unittest.main()
