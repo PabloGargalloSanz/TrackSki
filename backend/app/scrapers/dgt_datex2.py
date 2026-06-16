@@ -5,6 +5,7 @@ import hashlib
 import re
 import unicodedata
 from typing import Any
+from xml.etree import ElementTree
 
 
 SOURCE = "dgt_datex2_v37"
@@ -172,3 +173,155 @@ def make_stable_source_id(
         ]
     )
     return hashlib.sha256(base.encode("utf-8")).hexdigest()
+
+
+def parse_datex2_incidents(xml_content: str | bytes) -> list[NormalizedRoadIncident]:
+    root = ElementTree.fromstring(xml_content)
+    incidents = []
+
+    for record in _find_situation_records(root):
+        description = _extract_description(record)
+        raw_type = _extract_raw_type(record)
+        incident_type = normalize_incident_type(raw_type, description)
+        status = normalize_status(
+            _find_first_text(
+                record,
+                {"validityStatus", "situationRecordStatus", "lifeCycleManagement"},
+            )
+        )
+        severity = normalize_severity(
+            _find_first_text(record, {"severity", "trafficConstrictionType"}),
+            incident_type,
+            description,
+        )
+        road_code = extract_road_code(description)
+        start_km, end_km = extract_km_range(description)
+        starts_at = _parse_datetime(
+            _find_first_text(record, {"overallStartTime", "validityStartTime"})
+        )
+        ends_at = _parse_datetime(
+            _find_first_text(record, {"overallEndTime", "validityEndTime"})
+        )
+        reported_at = _parse_datetime(
+            _find_first_text(record, {"situationRecordCreationTime", "publicationTime"})
+        )
+        updated_at = _parse_datetime(
+            _find_first_text(record, {"situationRecordVersionTime", "publicationTime"})
+        )
+        source_id = (
+            record.attrib.get("id")
+            or record.attrib.get("{http://www.w3.org/XML/1998/namespace}id")
+            or make_stable_source_id(road_code, description, starts_at)
+        )
+
+        incidents.append(
+            NormalizedRoadIncident(
+                source=SOURCE,
+                source_id=source_id,
+                road_code=road_code,
+                title=_find_first_text(record, {"situationRecordName", "headline"}),
+                description=description,
+                incident_type=incident_type,
+                status=status,
+                severity=severity,
+                start_km=start_km,
+                end_km=end_km,
+                direction=_find_first_text(record, {"direction", "directionBound"}),
+                latitude=_parse_decimal(_find_first_text(record, {"latitude"})),
+                longitude=_parse_decimal(_find_first_text(record, {"longitude"})),
+                starts_at=starts_at,
+                ends_at=ends_at,
+                reported_at=reported_at,
+                updated_at=updated_at,
+                raw_payload={
+                    "source_id": source_id,
+                    "raw_type": raw_type,
+                    "text": description,
+                },
+            )
+        )
+
+    return incidents
+
+
+def _find_situation_records(root: ElementTree.Element) -> list[ElementTree.Element]:
+    records = [
+        element
+        for element in root.iter()
+        if _local_name(element.tag).endswith("SituationRecord")
+        or _local_name(element.tag) == "situationRecord"
+    ]
+    if records:
+        return records
+
+    return [
+        element
+        for element in root.iter()
+        if _local_name(element.tag).lower() == "situation"
+    ]
+
+
+def _local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _find_first_text(
+    element: ElementTree.Element,
+    names: set[str],
+) -> str | None:
+    normalized_names = {name.lower() for name in names}
+    for child in element.iter():
+        if _local_name(child.tag).lower() in normalized_names and child.text:
+            text = child.text.strip()
+            if text:
+                return text
+
+    return None
+
+
+def _extract_description(element: ElementTree.Element) -> str | None:
+    preferred = _find_first_text(
+        element,
+        {"value", "comment", "description", "situationRecordDescription"},
+    )
+    if preferred:
+        return preferred
+
+    text_parts = [
+        child.text.strip()
+        for child in element.iter()
+        if child.text and child.text.strip()
+    ]
+    return " ".join(text_parts) if text_parts else None
+
+
+def _extract_raw_type(element: ElementTree.Element) -> str | None:
+    xsi_type = next(
+        (
+            value
+            for key, value in element.attrib.items()
+            if _local_name(key).lower() == "type"
+        ),
+        None,
+    )
+    return xsi_type or _local_name(element.tag)
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _parse_decimal(value: str | None) -> Decimal | None:
+    if not value:
+        return None
+
+    try:
+        return _to_decimal(value)
+    except Exception:
+        return None
