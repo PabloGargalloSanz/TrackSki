@@ -1,7 +1,11 @@
 from decimal import Decimal
 import unittest
 
-from app.services.road_access import km_ranges_overlap, overall_access_status
+from app.services.road_access import (
+    km_ranges_overlap,
+    most_relevant_access_role,
+    overall_access_status,
+)
 
 
 class RoadAccessTest(unittest.TestCase):
@@ -45,6 +49,70 @@ class RoadAccessTest(unittest.TestCase):
             overall_access_status([{"severity": "high"}]),
             "affected",
         )
+
+    def test_overall_access_status_for_direct_access_incidents(self) -> None:
+        self.assertEqual(
+            overall_access_status(
+                [
+                    {
+                        "incident_type": "road_closed",
+                        "severity": "critical",
+                        "access_role": "final_access",
+                    }
+                ]
+            ),
+            "closed",
+        )
+        self.assertEqual(
+            overall_access_status(
+                [
+                    {
+                        "incident_type": "chains_required",
+                        "severity": "high",
+                        "access_role": "primary",
+                    }
+                ]
+            ),
+            "chains",
+        )
+
+    def test_overall_access_status_for_approach_incidents(self) -> None:
+        self.assertEqual(
+            overall_access_status(
+                [
+                    {
+                        "incident_type": "road_closed",
+                        "severity": "critical",
+                        "access_role": "approach",
+                    }
+                ]
+            ),
+            "affected",
+        )
+        self.assertEqual(
+            overall_access_status(
+                [
+                    {
+                        "incident_type": "chains_required",
+                        "severity": "high",
+                        "access_role": "approach",
+                    }
+                ]
+            ),
+            "affected",
+        )
+
+    def test_most_relevant_access_role(self) -> None:
+        self.assertEqual(
+            most_relevant_access_role(
+                [
+                    {"access_role": "approach"},
+                    {"access_role": "final_access"},
+                ]
+            ),
+            "final_access",
+        )
+        self.assertIsNone(most_relevant_access_role([]))
 
 
 if __name__ == "__main__":

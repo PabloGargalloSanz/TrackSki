@@ -31,7 +31,11 @@ from app.schemas.resort import Coordinates, Resort
 from app.schemas.resort_summary import ResortSummary
 from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_report import WeatherReport
-from app.services.road_access import km_ranges_overlap, overall_access_status
+from app.services.road_access import (
+    km_ranges_overlap,
+    most_relevant_access_role,
+    overall_access_status,
+)
 
 router = APIRouter()
 ReportLimit = Annotated[int, Query(ge=1, le=100)]
@@ -250,16 +254,22 @@ def retrieve_resort_access_status(
             for access_road in access_roads
             if access_road["road_id"] == incident["road_id"]
         ]
-        if any(
-            km_ranges_overlap(
+        overlapping_access_roads = [
+            access_road
+            for access_road in access_candidates
+            if km_ranges_overlap(
                 access_road["from_km"],
                 access_road["to_km"],
                 incident["start_km"],
                 incident["end_km"],
             )
-            for access_road in access_candidates
-        ):
-            affected_incidents.append(incident)
+        ]
+        if overlapping_access_roads:
+            incident_with_access_role = dict(incident)
+            incident_with_access_role["access_role"] = most_relevant_access_role(
+                overlapping_access_roads
+            )
+            affected_incidents.append(incident_with_access_role)
 
     alternatives = get_road_alternatives_by_resort_id(db, resort_id)
 
