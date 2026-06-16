@@ -16,10 +16,13 @@ Actualmente existen:
 - Frontend SSR con Next.js 15 y React 19.
 - Listado y detalle de estaciones.
 - Ingesta meteorologica manual desde Open-Meteo.
+- Lectura de avisos oficiales AEMET.
+- Modelo de carreteras, accesos por estacion, incidencias y alternativas.
 - Despliegue automatico de `staging` y `main`.
 
 Los datos de nieve, carreteras y parte de la meteorologia incluidos en el seed
-son aproximados y solo sirven para desarrollo. AEMET todavia no esta integrado.
+son aproximados y solo sirven para desarrollo. Los datos reales se iran
+incorporando mediante ingestas controladas antes de automatizar jobs.
 
 ## 2. Estructura
 
@@ -32,7 +35,8 @@ backend/
     db/                  Sesion SQLAlchemy
     repositories/        Consultas SQL
     schemas/             Modelos de respuesta
-    services/weather/    Proveedores meteorologicos
+    services/            Logica de dominio
+      services/weather/    Proveedores meteorologicos
   db/init/               Esquema y seed inicial
   tests/                 Pruebas del backend
 frontend/
@@ -205,6 +209,8 @@ GET /resorts/{id}/snow-reports/latest
 GET /resorts/{id}/weather
 GET /resorts/{id}/weather/latest
 GET /resorts/{id}/roads
+GET /resorts/{id}/access-status
+GET /roads/incidents/active
 GET /roads/{id}/conditions/latest
 ```
 
@@ -221,7 +227,43 @@ GET /resorts
 GET /resorts/{id}/summary
 ```
 
-## 7. Ingesta con Open-Meteo
+## 7. Carreteras y accesos
+
+El modelo separa carretera, acceso e incidencia para evitar duplicar la misma
+carretera en varias estaciones:
+
+- `roads`: carretera unica, por ejemplo `A-395` o `C-28`.
+- `resort_access_roads`: relacion entre estacion y carretera, con tramo,
+  prioridad y rol del acceso.
+- `road_conditions`: estado resumido de una carretera.
+- `road_incidents`: cortes, restricciones, obras o incidencias activas.
+- `road_alternatives`: rutas alternativas configuradas manualmente.
+
+El endpoint principal para una estacion es:
+
+```text
+GET /resorts/{id}/access-status
+```
+
+Devuelve:
+
+- Estado global del acceso: `open`, `caution`, `affected` o `unknown`.
+- Carreteras de acceso de la estacion.
+- Incidencias activas que afectan a esas carreteras.
+- Alternativas disponibles.
+
+La relacion entre una incidencia y una estacion se calcula asi:
+
+- Debe coincidir la carretera.
+- Si hay kilometros informados en el acceso y en la incidencia, los tramos
+  deben solaparse.
+- Si faltan kilometros, se considera relevante por carretera y se deja visible
+  para revisar.
+
+De momento no hay job automatico de carreteras. La base queda preparada para
+integrar fuentes como DGT, gobiernos autonomicos o carga manual mas adelante.
+
+## 8. Ingesta con Open-Meteo
 
 Open-Meteo se consulta usando las coordenadas de cada estacion. Se normalizan:
 
@@ -268,10 +310,29 @@ cd backend
 python -m unittest discover -s tests -v
 ```
 
-## 8. AEMET
+## 9. AEMET
 
-AEMET sera una fuente de contraste para estaciones espanolas. La integracion
-esta pendiente y requerira una API key.
+AEMET se usa como fuente oficial espanola, especialmente para avisos de riesgo
+por nieve, viento, lluvia o temperaturas. Requiere configurar:
+
+```env
+AEMET_API_KEY=
+```
+
+Actualmente se puede ingerir avisos por area:
+
+```bash
+cd backend
+python -m app.commands.ingest_alerts --area 62
+```
+
+Areas utiles como referencia:
+
+```text
+61 Andalucia
+62 Aragon
+69 Catalonia
+```
 
 No se debe marcar un dato como verificado solo porque AEMET y Open-Meteo
 devuelvan valores parecidos. La validacion debera considerar:
@@ -283,7 +344,10 @@ devuelvan valores parecidos. La validacion debera considerar:
 
 Ambas fuentes deben conservarse por separado.
 
-## 9. Arquitectura de despliegue
+La ingesta automatica de AEMET tambien queda pendiente para una fase posterior,
+junto con el resto de jobs.
+
+## 10. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -311,7 +375,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 10. Traefik temporal
+## 11. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -343,7 +407,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 11. Staging y main
+## 12. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -381,7 +445,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 12. Despliegue automatico
+## 13. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -407,7 +471,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 13. Comprobaciones
+## 14. Comprobaciones
 
 Estado:
 
@@ -445,7 +509,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 14. Problemas habituales
+## 15. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -478,7 +542,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 15. Migracion futura a 80/443
+## 16. Migracion futura a 80/443
 
 No realizarla todavia.
 

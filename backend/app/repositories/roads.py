@@ -1,3 +1,7 @@
+import json
+from datetime import datetime
+from typing import Any
+
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
@@ -88,6 +92,68 @@ def get_latest_road_condition_by_road_id(db: Session, road_id: int) -> dict | No
 
     row = result.mappings().one_or_none()
     return dict(row) if row else None
+
+
+def create_road_condition(
+    db: Session,
+    *,
+    road_id: int,
+    status: str,
+    severity: str = "unknown",
+    details: str | None = None,
+    data_source: str = "manual",
+    is_verified: bool = False,
+    source_updated_at: datetime | None = None,
+    raw_payload: dict[str, Any] | None = None,
+    reported_at: datetime | None = None,
+) -> int:
+    result = db.execute(
+        text(
+            """
+            INSERT INTO road_conditions (
+                road_id,
+                status,
+                severity,
+                details,
+                data_source,
+                is_verified,
+                source_updated_at,
+                raw_payload,
+                reported_at
+            )
+            VALUES (
+                :road_id,
+                :status,
+                :severity,
+                :details,
+                :data_source,
+                :is_verified,
+                :source_updated_at,
+                CAST(:raw_payload AS JSONB),
+                COALESCE(
+                    CAST(:reported_at AS TIMESTAMP WITH TIME ZONE),
+                    CURRENT_TIMESTAMP
+                )
+            )
+            RETURNING id
+            """
+        ),
+        {
+            "road_id": road_id,
+            "status": status,
+            "severity": severity,
+            "details": details,
+            "data_source": data_source,
+            "is_verified": is_verified,
+            "source_updated_at": source_updated_at,
+            "raw_payload": (
+                json.dumps(raw_payload) if raw_payload is not None else None
+            ),
+            "reported_at": reported_at,
+        },
+    )
+
+    return result.scalar_one()
 
 
 def get_active_road_incidents(db: Session) -> list[dict]:
