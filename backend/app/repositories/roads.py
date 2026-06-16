@@ -323,10 +323,30 @@ def upsert_road_incident(
     return result.scalar_one()
 
 
-def get_active_road_incidents(db: Session) -> list[dict]:
+def get_active_road_incidents(
+    db: Session,
+    *,
+    road_code: str | None = None,
+    severity: str | None = None,
+    incident_type: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    filters = ["status IN ('active', 'planned')"]
+    params = {"limit": limit}
+    if road_code:
+        filters.append("road_code = :road_code")
+        params["road_code"] = road_code
+    if severity:
+        filters.append("severity = :severity")
+        params["severity"] = severity
+    if incident_type:
+        filters.append("incident_type = :incident_type")
+        params["incident_type"] = incident_type
+
+    where_clause = " AND ".join(filters)
     result = db.execute(
         text(
-            """
+            f"""
             SELECT
                 id,
                 road_id,
@@ -347,7 +367,7 @@ def get_active_road_incidents(db: Session) -> list[dict]:
                 reported_at,
                 updated_at
             FROM road_incidents
-            WHERE status IN ('active', 'planned')
+            WHERE {where_clause}
             ORDER BY
                 CASE severity
                     WHEN 'critical' THEN 1
@@ -358,8 +378,10 @@ def get_active_road_incidents(db: Session) -> list[dict]:
                 END,
                 updated_at DESC,
                 id DESC
+            LIMIT :limit
             """
-        )
+        ),
+        params,
     )
 
     return [dict(row) for row in result.mappings()]
