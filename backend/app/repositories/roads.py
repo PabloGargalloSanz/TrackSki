@@ -1,4 +1,4 @@
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 
@@ -127,6 +127,126 @@ def get_active_road_incidents(db: Session) -> list[dict]:
                 id DESC
             """
         )
+    )
+
+    return [dict(row) for row in result.mappings()]
+
+
+def get_access_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
+    result = db.execute(
+        text(
+            """
+            SELECT
+                resort_access_roads.id AS access_id,
+                resort_access_roads.access_role,
+                resort_access_roads.segment_description,
+                resort_access_roads.from_km,
+                resort_access_roads.to_km,
+                resort_access_roads.priority,
+                roads.id AS road_id,
+                roads.code,
+                roads.name,
+                ST_AsGeoJSON(roads.route)::json AS route,
+                roads.data_source,
+                roads.is_verified,
+                latest_condition.status AS latest_status,
+                latest_condition.severity AS latest_severity,
+                latest_condition.details AS latest_details,
+                latest_condition.reported_at AS latest_reported_at
+            FROM resort_access_roads
+            INNER JOIN roads ON roads.id = resort_access_roads.road_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    road_conditions.status,
+                    road_conditions.severity,
+                    road_conditions.details,
+                    road_conditions.reported_at
+                FROM road_conditions
+                WHERE road_conditions.road_id = roads.id
+                ORDER BY road_conditions.reported_at DESC, road_conditions.id DESC
+                LIMIT 1
+            ) AS latest_condition ON TRUE
+            WHERE resort_access_roads.resort_id = :resort_id
+              AND resort_access_roads.is_active = TRUE
+            ORDER BY resort_access_roads.priority, roads.code
+            """
+        ),
+        {"resort_id": resort_id},
+    )
+
+    return [dict(row) for row in result.mappings()]
+
+
+def get_active_road_incidents_for_road_ids(
+    db: Session,
+    road_ids: list[int],
+) -> list[dict]:
+    if not road_ids:
+        return []
+
+    statement = text(
+        """
+            SELECT
+                id,
+                road_id,
+                source,
+                road_code,
+                title,
+                description,
+                incident_type,
+                status,
+                severity,
+                start_km,
+                end_km,
+                direction,
+                ST_AsGeoJSON(location)::json AS location,
+                ST_AsGeoJSON(affected_route)::json AS affected_route,
+                starts_at,
+                ends_at,
+                reported_at,
+                updated_at
+            FROM road_incidents
+            WHERE status IN ('active', 'planned')
+              AND road_id IN :road_ids
+            ORDER BY
+                CASE severity
+                    WHEN 'critical' THEN 1
+                    WHEN 'high' THEN 2
+                    WHEN 'medium' THEN 3
+                    WHEN 'low' THEN 4
+                    ELSE 5
+                END,
+                updated_at DESC,
+                id DESC
+        """
+    ).bindparams(bindparam("road_ids", expanding=True))
+
+    result = db.execute(
+        statement,
+        {"road_ids": road_ids},
+    )
+
+    return [dict(row) for row in result.mappings()]
+
+
+def get_road_alternatives_by_resort_id(db: Session, resort_id: int) -> list[dict]:
+    result = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                affected_road_id,
+                alternative_road_id,
+                title,
+                description,
+                priority
+            FROM road_alternatives
+            WHERE resort_id = :resort_id
+              AND is_active = TRUE
+            ORDER BY priority, id
+            """
+        ),
+        {"resort_id": resort_id},
     )
 
     return [dict(row) for row in result.mappings()]

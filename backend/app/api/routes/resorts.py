@@ -4,7 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.repositories.roads import get_roads_by_resort_id
+from app.repositories.roads import (
+    get_access_roads_by_resort_id,
+    get_active_road_incidents_for_road_ids,
+    get_road_alternatives_by_resort_id,
+    get_roads_by_resort_id,
+)
 from app.repositories.resorts import get_resort_by_id, get_resorts
 from app.repositories.snow_reports import (
     get_latest_snow_report_by_resort_id,
@@ -14,11 +19,19 @@ from app.repositories.weather_reports import (
     get_latest_weather_report_by_resort_id,
     get_weather_reports_by_resort_id,
 )
-from app.schemas.road import Road, RoadConditionSummary
+from app.schemas.road import (
+    ResortAccessRoad,
+    ResortAccessStatusResponse,
+    Road,
+    RoadAlternative,
+    RoadConditionSummary,
+    RoadIncident,
+)
 from app.schemas.resort import Coordinates, Resort
 from app.schemas.resort_summary import ResortSummary
 from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_report import WeatherReport
+from app.services.road_access import km_ranges_overlap, overall_access_status
 
 router = APIRouter()
 ReportLimit = Annotated[int, Query(ge=1, le=100)]
@@ -110,6 +123,65 @@ def serialize_road(row: dict) -> Road:
     )
 
 
+def serialize_road_incident(row: dict) -> RoadIncident:
+    return RoadIncident(
+        id=row["id"],
+        road_id=row["road_id"],
+        road_code=row["road_code"],
+        title=row["title"],
+        description=row["description"],
+        incident_type=row["incident_type"],
+        status=row["status"],
+        severity=row["severity"],
+        start_km=row["start_km"],
+        end_km=row["end_km"],
+        direction=row["direction"],
+        location=row["location"],
+        affected_route=row["affected_route"],
+        starts_at=row["starts_at"],
+        ends_at=row["ends_at"],
+        reported_at=row["reported_at"],
+        updated_at=row["updated_at"],
+        source=row["source"],
+    )
+
+
+def serialize_access_road(row: dict) -> ResortAccessRoad:
+    road_row = {
+        "id": row["road_id"],
+        "code": row["code"],
+        "name": row["name"],
+        "route": row["route"],
+        "data_source": row["data_source"],
+        "is_verified": row["is_verified"],
+        "latest_status": row["latest_status"],
+        "latest_severity": row["latest_severity"],
+        "latest_details": row["latest_details"],
+        "latest_reported_at": row["latest_reported_at"],
+    }
+
+    return ResortAccessRoad(
+        id=row["access_id"],
+        road=serialize_road(road_row),
+        access_role=row["access_role"],
+        segment_description=row["segment_description"],
+        from_km=row["from_km"],
+        to_km=row["to_km"],
+        priority=row["priority"],
+    )
+
+
+def serialize_road_alternative(row: dict) -> RoadAlternative:
+    return RoadAlternative(
+        id=row["id"],
+        affected_road_id=row["affected_road_id"],
+        alternative_road_id=row["alternative_road_id"],
+        title=row["title"],
+        description=row["description"],
+        priority=row["priority"],
+    )
+
+
 @router.get("", response_model=list[Resort])
 def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
     return [serialize_resort(row) for row in get_resorts(db)]
@@ -152,6 +224,51 @@ def retrieve_resort_summary(
             serialize_weather_report(weather_report) if weather_report else None
         ),
         roads=[serialize_road(row) for row in roads],
+    )
+
+
+@router.get("/{resort_id}/access-status", response_model=ResortAccessStatusResponse)
+def retrieve_resort_access_status(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> ResortAccessStatusResponse:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    access_roads = get_access_roads_by_resort_id(db, resort_id)
+    road_ids = [row["road_id"] for row in access_roads]
+    incidents = get_active_road_incidents_for_road_ids(db, road_ids)
+
+    affected_incidents = []
+    for incident in incidents:
+        access_candidates = [
+            access_road
+            for access_road in access_roads
+            if access_road["road_id"] == incident["road_id"]
+        ]
+        if any(
+            km_ranges_overlap(
+                access_road["from_km"],
+                access_road["to_km"],
+                incident["start_km"],
+                incident["end_km"],
+            )
+            for access_road in access_candidates
+        ):
+            affected_incidents.append(incident)
+
+    alternatives = get_road_alternatives_by_resort_id(db, resort_id)
+
+    return ResortAccessStatusResponse(
+        resort_id=resort_id,
+        overall_status=overall_access_status(affected_incidents),
+        roads=[serialize_access_road(row) for row in access_roads],
+        incidents=[serialize_road_incident(row) for row in affected_incidents],
+        alternatives=[serialize_road_alternative(row) for row in alternatives],
     )
 
 

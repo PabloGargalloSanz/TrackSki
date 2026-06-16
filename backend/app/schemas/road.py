@@ -50,3 +50,30 @@ class RoadIncident(BaseModel):
     reported_at: datetime | None
     updated_at: datetime
     source: str
+
+
+class ResortAccessRoad(BaseModel):
+    id: int
+    road: Road
+    access_role: str
+    segment_description: str | None
+    from_km: float | None
+    to_km: float | None
+    priority: int
+
+
+class RoadAlternative(BaseModel):
+    id: int
+    affected_road_id: int | None
+    alternative_road_id: int | None
+    title: str
+    description: str
+    priority: int
+
+
+class ResortAccessStatusResponse(BaseModel):
+    resort_id: int
+    overall_status: str
+    roads: list[ResortAccessRoad]
+    incidents: list[RoadIncident]
+    alternatives: list[RoadAlternative]
