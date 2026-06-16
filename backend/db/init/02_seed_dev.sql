@@ -5,6 +5,11 @@ INSERT INTO ski_resorts (name, country, region, location, data_source, is_verifi
 VALUES
     ('Baqueira Beret', 'Spain', 'Val d''Aran', ST_SetSRID(ST_MakePoint(0.9326, 42.6985), 4326), 'dev_seed', FALSE),
     ('Formigal-Panticosa', 'Spain', 'Huesca', ST_SetSRID(ST_MakePoint(-0.3632, 42.7753), 4326), 'dev_seed', FALSE),
+    ('Formigal', 'Spain', 'Huesca', ST_SetSRID(ST_MakePoint(-0.3632, 42.7753), 4326), 'dev_seed', FALSE),
+    ('Panticosa', 'Spain', 'Huesca', ST_SetSRID(ST_MakePoint(-0.2392, 42.7237), 4326), 'dev_seed', FALSE),
+    ('Astun', 'Spain', 'Huesca', ST_SetSRID(ST_MakePoint(-0.5060, 42.8105), 4326), 'dev_seed', FALSE),
+    ('Candanchu', 'Spain', 'Huesca', ST_SetSRID(ST_MakePoint(-0.5287, 42.7886), 4326), 'dev_seed', FALSE),
+    ('Cerler', 'Spain', 'Huesca', ST_SetSRID(ST_MakePoint(0.5404, 42.5898), 4326), 'dev_seed', FALSE),
     ('Sierra Nevada', 'Spain', 'Granada', ST_SetSRID(ST_MakePoint(-3.4006, 37.0956), 4326), 'dev_seed', FALSE),
     ('Grandvalira', 'Andorra', 'Canillo / Encamp', ST_SetSRID(ST_MakePoint(1.6670, 42.5775), 4326), 'dev_seed', FALSE)
 ON CONFLICT (name) DO NOTHING;
@@ -14,7 +19,46 @@ VALUES ('C-28', 'C-28 acceso Val d''Aran', ST_GeomFromText('LINESTRING(0.7950 42
 ON CONFLICT DO NOTHING;
 
 INSERT INTO roads (code, name, route, data_source, is_verified)
-VALUES ('A-136', 'A-136 acceso Valle de Tena', ST_GeomFromText('LINESTRING(-0.4100 42.7580, -0.3860 42.7670, -0.3632 42.7753)', 4326), 'dev_seed', FALSE)
+VALUES ('A-136', 'A-136 acceso Valle de Tena', ST_GeomFromText('LINESTRING(-0.4100 42.7580, -0.3860 42.7670, -0.3632 42.7753)', 4326), 'manual', FALSE)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO roads (code, name, route, data_source, is_verified)
+VALUES
+    (
+        'A-23',
+        'A-23 aproximacion por Monrepos',
+        ST_GeomFromText('LINESTRING(-0.8891 41.6488, -0.4089 42.1362, -0.3595 42.5192, -0.5490 42.5705)', 4326),
+        'manual',
+        FALSE
+    ),
+    (
+        'N-260',
+        'N-260 eje pirenaico',
+        ST_GeomFromText('LINESTRING(-0.5490 42.5705, -0.3210 42.6280, -0.1040 42.6290, 0.4890 42.6060)', 4326),
+        'manual',
+        FALSE
+    ),
+    (
+        'N-330',
+        'N-330 acceso valle del Aragon',
+        ST_GeomFromText('LINESTRING(-0.5490 42.5705, -0.5370 42.7010, -0.5160 42.7510, -0.5060 42.8105)', 4326),
+        'manual',
+        FALSE
+    ),
+    (
+        'A-2606',
+        'A-2606 acceso Astun/Candanchu',
+        ST_GeomFromText('LINESTRING(-0.5287 42.7886, -0.5180 42.8000, -0.5060 42.8105)', 4326),
+        'manual',
+        FALSE
+    ),
+    (
+        'A-139',
+        'A-139 acceso valle de Benasque',
+        ST_GeomFromText('LINESTRING(0.4890 42.6060, 0.5230 42.6050, 0.5404 42.5898)', 4326),
+        'manual',
+        FALSE
+    )
 ON CONFLICT DO NOTHING;
 
 INSERT INTO roads (code, name, route, data_source, is_verified)
@@ -83,6 +127,153 @@ SELECT ski_resorts.id, roads.id, 'primary', 'Acceso principal aproximado a Grand
 FROM ski_resorts
 JOIN roads ON roads.code = 'CG-2'
 WHERE ski_resorts.name = 'Grandvalira'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO resort_access_roads (
+    resort_id,
+    road_id,
+    access_role,
+    segment_description,
+    priority,
+    data_source,
+    is_verified
+)
+VALUES
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Formigal'),
+        (SELECT id FROM roads WHERE code = 'A-23' AND data_source = 'manual'),
+        'approach',
+        'Aproximacion desde Huesca/Zaragoza por Monrepos hacia Sabinanigo/Biescas.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Formigal'),
+        (SELECT id FROM roads WHERE code = 'N-260' AND data_source = 'manual'),
+        'approach',
+        'Eje pirenaico y conexion hacia Biescas/Valle de Tena segun origen.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Formigal'),
+        (SELECT id FROM roads WHERE code = 'A-136' AND data_source = 'manual'),
+        'final_access',
+        'Acceso por Valle de Tena hacia Sallent de Gallego/Formigal.',
+        1,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Panticosa'),
+        (SELECT id FROM roads WHERE code = 'A-23' AND data_source = 'manual'),
+        'approach',
+        'Aproximacion desde Huesca/Zaragoza por Monrepos hacia Sabinanigo/Biescas.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Panticosa'),
+        (SELECT id FROM roads WHERE code = 'N-260' AND data_source = 'manual'),
+        'approach',
+        'Eje pirenaico y conexion hacia Biescas/Valle de Tena segun origen.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Panticosa'),
+        (SELECT id FROM roads WHERE code = 'A-136' AND data_source = 'manual'),
+        'primary',
+        'Acceso por Valle de Tena hacia Panticosa.',
+        1,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Astun'),
+        (SELECT id FROM roads WHERE code = 'A-23' AND data_source = 'manual'),
+        'approach',
+        'Aproximacion desde Huesca/Zaragoza hacia Jaca.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Astun'),
+        (SELECT id FROM roads WHERE code = 'N-330' AND data_source = 'manual'),
+        'primary',
+        'Acceso Jaca-Canfranc hacia el valle del Aragon.',
+        1,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Astun'),
+        (SELECT id FROM roads WHERE code = 'A-2606' AND data_source = 'manual'),
+        'final_access',
+        'Acceso final hacia Astun/Candanchu si procede segun ruta.',
+        1,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Candanchu'),
+        (SELECT id FROM roads WHERE code = 'A-23' AND data_source = 'manual'),
+        'approach',
+        'Aproximacion desde Huesca/Zaragoza hacia Jaca.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Candanchu'),
+        (SELECT id FROM roads WHERE code = 'N-330' AND data_source = 'manual'),
+        'primary',
+        'Acceso Jaca-Canfranc hacia Candanchu.',
+        1,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Candanchu'),
+        (SELECT id FROM roads WHERE code = 'A-2606' AND data_source = 'manual'),
+        'final_access',
+        'Acceso final hacia Astun/Candanchu si procede segun ruta.',
+        1,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Cerler'),
+        (SELECT id FROM roads WHERE code = 'A-23' AND data_source = 'manual'),
+        'approach',
+        'Aproximacion desde Huesca/Zaragoza hacia la zona oriental de Huesca, segun origen.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Cerler'),
+        (SELECT id FROM roads WHERE code = 'N-260' AND data_source = 'manual'),
+        'approach',
+        'Eje hacia Castejon de Sos / valle de Benasque segun origen.',
+        3,
+        'manual',
+        FALSE
+    ),
+    (
+        (SELECT id FROM ski_resorts WHERE name = 'Cerler'),
+        (SELECT id FROM roads WHERE code = 'A-139' AND data_source = 'manual'),
+        'final_access',
+        'Acceso por valle de Benasque hacia Cerler.',
+        1,
+        'manual',
+        FALSE
+    )
 ON CONFLICT DO NOTHING;
 
 INSERT INTO snow_reports (

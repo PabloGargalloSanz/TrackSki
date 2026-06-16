@@ -210,6 +210,7 @@ GET /resorts/{id}/weather
 GET /resorts/{id}/weather/latest
 GET /resorts/{id}/roads
 GET /resorts/{id}/access-status
+GET /roads
 GET /roads/incidents/active
 GET /roads/{id}/conditions/latest
 ```
@@ -247,7 +248,8 @@ GET /resorts/{id}/access-status
 
 Devuelve:
 
-- Estado global del acceso: `open`, `caution`, `affected` o `unknown`.
+- Estado global del acceso: `open`, `caution`, `affected`, `chains`, `closed`
+  o `unknown`.
 - Carreteras de acceso de la estacion.
 - Incidencias activas que afectan a esas carreteras.
 - Alternativas disponibles.
@@ -260,8 +262,44 @@ La relacion entre una incidencia y una estacion se calcula asi:
 - Si faltan kilometros, se considera relevante por carretera y se deja visible
   para revisar.
 
-De momento no hay job automatico de carreteras. La base queda preparada para
-integrar fuentes como DGT, gobiernos autonomicos o carga manual mas adelante.
+La seed de desarrollo incluye accesos iniciales para estaciones de Aragon. No
+solo se modelan carreteras finales a estacion: tambien se incluyen carreteras
+de aproximacion como `A-23` y `N-260`, porque pueden condicionar la subida
+desde origenes habituales como Zaragoza o Huesca.
+
+No se inventan PK. Si no hay kilometros verificados, `from_km` y `to_km`
+quedan vacios. Las geometria de carreteras en la seed son aproximadas y no
+verificadas.
+
+Importar incidencias DGT DATEX2:
+
+```bash
+cd backend
+python -m app.jobs.import_dgt_datex2_incidents
+```
+
+El importador:
+
+- Descarga DGT DATEX2 v3.7.
+- Normaliza incidencias.
+- Guarda en `road_incidents`.
+- Enlaza con `roads` por `road_code`.
+- Actualiza `road_conditions` con un resumen por carretera.
+- No expone `raw_payload` en endpoints publicos.
+- No fuerza una carretera como `open` si DGT no informa incidencias.
+
+Consultar:
+
+```text
+GET /roads
+GET /roads/incidents/active
+GET /roads/incidents/active?road_code=A-23
+GET /roads/incidents/active?severity=high
+GET /resorts/{id}/access-status
+```
+
+DGT DATEX2 no cubre Cataluna ni Pais Vasco. Esas fuentes quedan para una fase
+posterior junto con la ejecucion periodica del importador.
 
 ## 8. Ingesta con Open-Meteo
 

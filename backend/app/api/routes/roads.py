@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -6,10 +8,12 @@ from app.repositories.roads import (
     get_active_road_incidents,
     get_latest_road_condition_by_road_id,
     get_road_by_id,
+    get_roads,
 )
-from app.schemas.road import RoadCondition, RoadIncident
+from app.schemas.road import Road, RoadCondition, RoadConditionSummary, RoadIncident
 
 router = APIRouter()
+IncidentLimit = Annotated[int, Query(ge=1, le=500)]
 
 
 def serialize_road_condition(row: dict) -> RoadCondition:
@@ -22,6 +26,27 @@ def serialize_road_condition(row: dict) -> RoadCondition:
         data_source=row["data_source"],
         is_verified=row["is_verified"],
         reported_at=row["reported_at"],
+    )
+
+
+def serialize_road(row: dict) -> Road:
+    latest_condition = None
+    if row["latest_status"] and row["latest_reported_at"]:
+        latest_condition = RoadConditionSummary(
+            status=row["latest_status"],
+            severity=row["latest_severity"],
+            details=row["latest_details"],
+            reported_at=row["latest_reported_at"],
+        )
+
+    return Road(
+        id=row["id"],
+        code=row["code"],
+        name=row["name"],
+        route=row["route"],
+        latest_condition=latest_condition,
+        data_source=row["data_source"],
+        is_verified=row["is_verified"],
     )
 
 
@@ -48,11 +73,29 @@ def serialize_road_incident(row: dict) -> RoadIncident:
     )
 
 
+@router.get("", response_model=list[Road])
+def list_roads(db: Session = Depends(get_db)) -> list[Road]:
+    return [serialize_road(row) for row in get_roads(db)]
+
+
 @router.get("/incidents/active", response_model=list[RoadIncident])
 def list_active_road_incidents(
+    road_code: str | None = None,
+    severity: str | None = None,
+    incident_type: str | None = None,
+    limit: IncidentLimit = 100,
     db: Session = Depends(get_db),
 ) -> list[RoadIncident]:
-    return [serialize_road_incident(row) for row in get_active_road_incidents(db)]
+    return [
+        serialize_road_incident(row)
+        for row in get_active_road_incidents(
+            db,
+            road_code=road_code,
+            severity=severity,
+            incident_type=incident_type,
+            limit=limit,
+        )
+    ]
 
 
 @router.get("/{road_id}/conditions/latest", response_model=RoadCondition)

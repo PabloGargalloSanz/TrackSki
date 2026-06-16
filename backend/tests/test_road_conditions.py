@@ -6,6 +6,7 @@ import unittest
 from app.repositories.roads import (
     create_road_condition,
     get_best_road_id_by_code,
+    upsert_road_condition_summary,
     upsert_road_incident,
 )
 from app.scrapers.dgt_datex2 import NormalizedRoadIncident
@@ -96,6 +97,35 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(params["longitude"], Decimal("-0.3632"))
         self.assertEqual(params["updated_at"], updated_at)
         self.assertEqual(params["raw_payload"], '{"source_id": "record-1"}')
+
+    def test_upsert_road_condition_summary_returns_saved_id(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.scalar_one.return_value = 789
+        db.execute.return_value = result
+        source_updated_at = datetime(2026, 1, 15, 10, 5, tzinfo=timezone.utc)
+
+        condition_id = upsert_road_condition_summary(
+            db,
+            road_id=7,
+            status="chains",
+            severity="high",
+            details="DGT DATEX2: cadenas",
+            data_source="dgt_datex2_v37",
+            source_updated_at=source_updated_at,
+            raw_payload={"source_ids": ["record-1"]},
+        )
+
+        self.assertEqual(condition_id, 789)
+
+        _, params = db.execute.call_args.args
+        self.assertEqual(params["road_id"], 7)
+        self.assertEqual(params["status"], "chains")
+        self.assertEqual(params["severity"], "high")
+        self.assertEqual(params["details"], "DGT DATEX2: cadenas")
+        self.assertEqual(params["data_source"], "dgt_datex2_v37")
+        self.assertEqual(params["source_updated_at"], source_updated_at)
+        self.assertEqual(params["raw_payload"], '{"source_ids": ["record-1"]}')
 
 
 if __name__ == "__main__":

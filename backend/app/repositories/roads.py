@@ -8,6 +8,41 @@ from sqlalchemy.orm import Session
 from app.scrapers.dgt_datex2 import NormalizedRoadIncident
 
 
+def get_roads(db: Session) -> list[dict]:
+    result = db.execute(
+        text(
+            """
+            SELECT
+                roads.id,
+                roads.code,
+                roads.name,
+                ST_AsGeoJSON(roads.route)::json AS route,
+                roads.data_source,
+                roads.is_verified,
+                latest_condition.status AS latest_status,
+                latest_condition.severity AS latest_severity,
+                latest_condition.details AS latest_details,
+                latest_condition.reported_at AS latest_reported_at
+            FROM roads
+            LEFT JOIN LATERAL (
+                SELECT
+                    road_conditions.status,
+                    road_conditions.severity,
+                    road_conditions.details,
+                    road_conditions.reported_at
+                FROM road_conditions
+                WHERE road_conditions.road_id = roads.id
+                ORDER BY road_conditions.reported_at DESC, road_conditions.id DESC
+                LIMIT 1
+            ) AS latest_condition ON TRUE
+            ORDER BY roads.code, roads.id
+            """
+        )
+    )
+
+    return [dict(row) for row in result.mappings()]
+
+
 def get_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
     result = db.execute(
         text(
@@ -184,6 +219,86 @@ def create_road_condition(
     return result.scalar_one()
 
 
+def upsert_road_condition_summary(
+    db: Session,
+    *,
+    road_id: int,
+    status: str,
+    severity: str,
+    details: str | None,
+    data_source: str,
+    source_updated_at: datetime | None = None,
+    raw_payload: dict[str, Any] | None = None,
+) -> int:
+    result = db.execute(
+        text(
+            """
+            WITH latest AS (
+                SELECT id
+                FROM road_conditions
+                WHERE road_id = :road_id
+                  AND data_source = :data_source
+                ORDER BY reported_at DESC, id DESC
+                LIMIT 1
+            ),
+            updated AS (
+                UPDATE road_conditions
+                SET
+                    status = :status,
+                    severity = :severity,
+                    details = :details,
+                    is_verified = FALSE,
+                    source_updated_at = :source_updated_at,
+                    raw_payload = CAST(:raw_payload AS JSONB),
+                    reported_at = CURRENT_TIMESTAMP
+                WHERE id IN (SELECT id FROM latest)
+                RETURNING id
+            ),
+            inserted AS (
+                INSERT INTO road_conditions (
+                    road_id,
+                    status,
+                    severity,
+                    details,
+                    data_source,
+                    is_verified,
+                    source_updated_at,
+                    raw_payload
+                )
+                SELECT
+                    :road_id,
+                    :status,
+                    :severity,
+                    :details,
+                    :data_source,
+                    FALSE,
+                    :source_updated_at,
+                    CAST(:raw_payload AS JSONB)
+                WHERE NOT EXISTS (SELECT 1 FROM updated)
+                RETURNING id
+            )
+            SELECT id FROM updated
+            UNION ALL
+            SELECT id FROM inserted
+            LIMIT 1
+            """
+        ),
+        {
+            "road_id": road_id,
+            "status": status,
+            "severity": severity,
+            "details": details,
+            "data_source": data_source,
+            "source_updated_at": source_updated_at,
+            "raw_payload": (
+                json.dumps(raw_payload) if raw_payload is not None else None
+            ),
+        },
+    )
+
+    return result.scalar_one()
+
+
 def upsert_road_incident(
     db: Session,
     incident: NormalizedRoadIncident,
@@ -288,10 +403,30 @@ def upsert_road_incident(
     return result.scalar_one()
 
 
-def get_active_road_incidents(db: Session) -> list[dict]:
+def get_active_road_incidents(
+    db: Session,
+    *,
+    road_code: str | None = None,
+    severity: str | None = None,
+    incident_type: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    filters = ["status IN ('active', 'planned')"]
+    params = {"limit": limit}
+    if road_code:
+        filters.append("road_code = :road_code")
+        params["road_code"] = road_code
+    if severity:
+        filters.append("severity = :severity")
+        params["severity"] = severity
+    if incident_type:
+        filters.append("incident_type = :incident_type")
+        params["incident_type"] = incident_type
+
+    where_clause = " AND ".join(filters)
     result = db.execute(
         text(
-            """
+            f"""
             SELECT
                 id,
                 road_id,
@@ -312,7 +447,7 @@ def get_active_road_incidents(db: Session) -> list[dict]:
                 reported_at,
                 updated_at
             FROM road_incidents
-            WHERE status IN ('active', 'planned')
+            WHERE {where_clause}
             ORDER BY
                 CASE severity
                     WHEN 'critical' THEN 1
@@ -323,8 +458,10 @@ def get_active_road_incidents(db: Session) -> list[dict]:
                 END,
                 updated_at DESC,
                 id DESC
+            LIMIT :limit
             """
-        )
+        ),
+        params,
     )
 
     return [dict(row) for row in result.mappings()]
