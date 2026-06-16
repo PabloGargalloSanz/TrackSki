@@ -59,11 +59,12 @@ export type LineString = {
 
 export type Road = {
   id: number;
-  resort_id: number | null;
-  name: string;
-  route: LineString;
+  code: string;
+  name: string | null;
+  route: LineString | null;
   latest_condition: {
     status: string;
+    severity: string;
     details: string | null;
     reported_at: string;
   } | null;

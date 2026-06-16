@@ -94,13 +94,14 @@ def serialize_road(row: dict) -> Road:
     if row["latest_status"] and row["latest_reported_at"]:
         latest_condition = RoadConditionSummary(
             status=row["latest_status"],
+            severity=row["latest_severity"],
             details=row["latest_details"],
             reported_at=row["latest_reported_at"],
         )
 
     return Road(
         id=row["id"],
-        resort_id=row["resort_id"],
+        code=row["code"],
         name=row["name"],
         route=row["route"],
         latest_condition=latest_condition,

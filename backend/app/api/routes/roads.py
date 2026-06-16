@@ -16,6 +16,7 @@ def serialize_road_condition(row: dict) -> RoadCondition:
         id=row["id"],
         road_id=row["road_id"],
         status=row["status"],
+        severity=row["severity"],
         details=row["details"],
         data_source=row["data_source"],
         is_verified=row["is_verified"],
