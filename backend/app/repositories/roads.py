@@ -219,6 +219,86 @@ def create_road_condition(
     return result.scalar_one()
 
 
+def upsert_road_condition_summary(
+    db: Session,
+    *,
+    road_id: int,
+    status: str,
+    severity: str,
+    details: str | None,
+    data_source: str,
+    source_updated_at: datetime | None = None,
+    raw_payload: dict[str, Any] | None = None,
+) -> int:
+    result = db.execute(
+        text(
+            """
+            WITH latest AS (
+                SELECT id
+                FROM road_conditions
+                WHERE road_id = :road_id
+                  AND data_source = :data_source
+                ORDER BY reported_at DESC, id DESC
+                LIMIT 1
+            ),
+            updated AS (
+                UPDATE road_conditions
+                SET
+                    status = :status,
+                    severity = :severity,
+                    details = :details,
+                    is_verified = FALSE,
+                    source_updated_at = :source_updated_at,
+                    raw_payload = CAST(:raw_payload AS JSONB),
+                    reported_at = CURRENT_TIMESTAMP
+                WHERE id IN (SELECT id FROM latest)
+                RETURNING id
+            ),
+            inserted AS (
+                INSERT INTO road_conditions (
+                    road_id,
+                    status,
+                    severity,
+                    details,
+                    data_source,
+                    is_verified,
+                    source_updated_at,
+                    raw_payload
+                )
+                SELECT
+                    :road_id,
+                    :status,
+                    :severity,
+                    :details,
+                    :data_source,
+                    FALSE,
+                    :source_updated_at,
+                    CAST(:raw_payload AS JSONB)
+                WHERE NOT EXISTS (SELECT 1 FROM updated)
+                RETURNING id
+            )
+            SELECT id FROM updated
+            UNION ALL
+            SELECT id FROM inserted
+            LIMIT 1
+            """
+        ),
+        {
+            "road_id": road_id,
+            "status": status,
+            "severity": severity,
+            "details": details,
+            "data_source": data_source,
+            "source_updated_at": source_updated_at,
+            "raw_payload": (
+                json.dumps(raw_payload) if raw_payload is not None else None
+            ),
+        },
+    )
+
+    return result.scalar_one()
+
+
 def upsert_road_incident(
     db: Session,
     incident: NormalizedRoadIncident,

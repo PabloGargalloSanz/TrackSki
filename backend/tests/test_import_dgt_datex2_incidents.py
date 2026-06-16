@@ -30,12 +30,14 @@ def make_incident(road_code: str | None = "A-136") -> NormalizedRoadIncident:
 
 
 class ImportDgtDatex2IncidentsTest(unittest.TestCase):
+    @patch("app.jobs.import_dgt_datex2_incidents.upsert_road_condition_summary")
     @patch("app.jobs.import_dgt_datex2_incidents.upsert_road_incident")
     @patch("app.jobs.import_dgt_datex2_incidents.get_best_road_id_by_code")
     def test_save_dgt_incidents_matches_road(
         self,
         get_best_road_id_by_code: Mock,
         upsert_road_incident: Mock,
+        upsert_road_condition_summary: Mock,
     ) -> None:
         db = Mock()
         incident = make_incident()
@@ -48,15 +50,25 @@ class ImportDgtDatex2IncidentsTest(unittest.TestCase):
         self.assertEqual(summary.skipped, 0)
         self.assertEqual(summary.roads_matched, 1)
         self.assertEqual(summary.roads_unmatched_skipped, 0)
+        self.assertEqual(summary.road_conditions_updated, 1)
         get_best_road_id_by_code.assert_called_once_with(db, "A-136")
         upsert_road_incident.assert_called_once_with(db, incident, road_id=7)
+        upsert_road_condition_summary.assert_called_once()
 
+        _, kwargs = upsert_road_condition_summary.call_args
+        self.assertEqual(kwargs["road_id"], 7)
+        self.assertEqual(kwargs["status"], "chains")
+        self.assertEqual(kwargs["severity"], "high")
+        self.assertEqual(kwargs["data_source"], "dgt_datex2_v37")
+
+    @patch("app.jobs.import_dgt_datex2_incidents.upsert_road_condition_summary")
     @patch("app.jobs.import_dgt_datex2_incidents.upsert_road_incident")
     @patch("app.jobs.import_dgt_datex2_incidents.get_best_road_id_by_code")
     def test_save_dgt_incidents_skips_unmatched_road(
         self,
         get_best_road_id_by_code: Mock,
         upsert_road_incident: Mock,
+        upsert_road_condition_summary: Mock,
     ) -> None:
         db = Mock()
         incident = make_incident()
@@ -69,13 +81,16 @@ class ImportDgtDatex2IncidentsTest(unittest.TestCase):
         self.assertEqual(summary.roads_matched, 0)
         self.assertEqual(summary.roads_unmatched_skipped, 1)
         upsert_road_incident.assert_not_called()
+        upsert_road_condition_summary.assert_not_called()
 
+    @patch("app.jobs.import_dgt_datex2_incidents.upsert_road_condition_summary")
     @patch("app.jobs.import_dgt_datex2_incidents.upsert_road_incident")
     @patch("app.jobs.import_dgt_datex2_incidents.get_best_road_id_by_code")
     def test_save_dgt_incidents_without_road_code(
         self,
         get_best_road_id_by_code: Mock,
         upsert_road_incident: Mock,
+        upsert_road_condition_summary: Mock,
     ) -> None:
         db = Mock()
         incident = make_incident(road_code=None)
@@ -88,6 +103,7 @@ class ImportDgtDatex2IncidentsTest(unittest.TestCase):
         self.assertEqual(summary.roads_matched, 0)
         get_best_road_id_by_code.assert_not_called()
         upsert_road_incident.assert_not_called()
+        upsert_road_condition_summary.assert_not_called()
 
 
 if __name__ == "__main__":
