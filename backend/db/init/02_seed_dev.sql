@@ -9,28 +9,80 @@ VALUES
     ('Grandvalira', 'Andorra', 'Canillo / Encamp', ST_SetSRID(ST_MakePoint(1.6670, 42.5775), 4326), 'dev_seed', FALSE)
 ON CONFLICT (name) DO NOTHING;
 
-INSERT INTO roads (resort_id, name, route, data_source, is_verified)
-SELECT id, 'C-28', ST_GeomFromText('LINESTRING(0.7950 42.7010, 0.8650 42.7020, 0.9326 42.6985)', 4326), 'dev_seed', FALSE
-FROM ski_resorts
-WHERE name = 'Baqueira Beret'
+INSERT INTO roads (code, name, route, data_source, is_verified)
+VALUES ('C-28', 'C-28 acceso Val d''Aran', ST_GeomFromText('LINESTRING(0.7950 42.7010, 0.8650 42.7020, 0.9326 42.6985)', 4326), 'dev_seed', FALSE)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO roads (resort_id, name, route, data_source, is_verified)
-SELECT id, 'A-136', ST_GeomFromText('LINESTRING(-0.4100 42.7580, -0.3860 42.7670, -0.3632 42.7753)', 4326), 'dev_seed', FALSE
-FROM ski_resorts
-WHERE name = 'Formigal-Panticosa'
+INSERT INTO roads (code, name, route, data_source, is_verified)
+VALUES ('A-136', 'A-136 acceso Valle de Tena', ST_GeomFromText('LINESTRING(-0.4100 42.7580, -0.3860 42.7670, -0.3632 42.7753)', 4326), 'dev_seed', FALSE)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO roads (resort_id, name, route, data_source, is_verified)
-SELECT id, 'A-395', ST_GeomFromText('LINESTRING(-3.4590 37.1320, -3.4300 37.1140, -3.4006 37.0956)', 4326), 'dev_seed', FALSE
-FROM ski_resorts
-WHERE name = 'Sierra Nevada'
+INSERT INTO roads (code, name, route, data_source, is_verified)
+VALUES ('A-395', 'A-395 acceso Sierra Nevada', ST_GeomFromText('LINESTRING(-3.4590 37.1320, -3.4300 37.1140, -3.4006 37.0956)', 4326), 'dev_seed', FALSE)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO roads (resort_id, name, route, data_source, is_verified)
-SELECT id, 'CG-2', ST_GeomFromText('LINESTRING(1.5900 42.5420, 1.6200 42.5570, 1.6670 42.5775)', 4326), 'dev_seed', FALSE
+INSERT INTO roads (code, name, route, data_source, is_verified)
+VALUES ('CG-2', 'CG-2 acceso Grandvalira', ST_GeomFromText('LINESTRING(1.5900 42.5420, 1.6200 42.5570, 1.6670 42.5775)', 4326), 'dev_seed', FALSE)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO resort_access_roads (
+    resort_id,
+    road_id,
+    access_role,
+    segment_description,
+    priority,
+    data_source,
+    is_verified
+)
+SELECT ski_resorts.id, roads.id, 'primary', 'Acceso principal aproximado a Baqueira Beret', 1, 'dev_seed', FALSE
 FROM ski_resorts
-WHERE name = 'Grandvalira'
+JOIN roads ON roads.code = 'C-28'
+WHERE ski_resorts.name = 'Baqueira Beret'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO resort_access_roads (
+    resort_id,
+    road_id,
+    access_role,
+    segment_description,
+    priority,
+    data_source,
+    is_verified
+)
+SELECT ski_resorts.id, roads.id, 'primary', 'Acceso principal aproximado a Formigal-Panticosa', 1, 'dev_seed', FALSE
+FROM ski_resorts
+JOIN roads ON roads.code = 'A-136'
+WHERE ski_resorts.name = 'Formigal-Panticosa'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO resort_access_roads (
+    resort_id,
+    road_id,
+    access_role,
+    segment_description,
+    priority,
+    data_source,
+    is_verified
+)
+SELECT ski_resorts.id, roads.id, 'primary', 'Acceso principal aproximado a Sierra Nevada', 1, 'dev_seed', FALSE
+FROM ski_resorts
+JOIN roads ON roads.code = 'A-395'
+WHERE ski_resorts.name = 'Sierra Nevada'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO resort_access_roads (
+    resort_id,
+    road_id,
+    access_role,
+    segment_description,
+    priority,
+    data_source,
+    is_verified
+)
+SELECT ski_resorts.id, roads.id, 'primary', 'Acceso principal aproximado a Grandvalira', 1, 'dev_seed', FALSE
+FROM ski_resorts
+JOIN roads ON roads.code = 'CG-2'
+WHERE ski_resorts.name = 'Grandvalira'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO snow_reports (
@@ -113,12 +165,12 @@ SELECT id, -1.0, 24.5, 'N', 1.20, 3500, 'Snow showers', 'dev_seed', FALSE
 FROM ski_resorts
 WHERE name = 'Formigal-Panticosa';
 
-INSERT INTO road_conditions (road_id, status, details, data_source, is_verified)
-SELECT id, 'Open', 'Road open. Drive carefully in shaded areas.', 'dev_seed', FALSE
+INSERT INTO road_conditions (road_id, status, severity, details, data_source, is_verified)
+SELECT id, 'open', 'low', 'Road open. Drive carefully in shaded areas.', 'dev_seed', FALSE
 FROM roads
-WHERE name = 'C-28';
+WHERE code = 'C-28';
 
-INSERT INTO road_conditions (road_id, status, details, data_source, is_verified)
-SELECT id, 'Chains recommended', 'Snow and ice patches near the resort access.', 'dev_seed', FALSE
+INSERT INTO road_conditions (road_id, status, severity, details, data_source, is_verified)
+SELECT id, 'chains', 'medium', 'Snow and ice patches near the resort access.', 'dev_seed', FALSE
 FROM roads
-WHERE name = 'A-136';
+WHERE code = 'A-136';

@@ -195,7 +195,7 @@ export default async function ResortDetailPage({
             {summary.roads.map((road) => (
               <article className="road-row" key={road.id}>
                 <div>
-                  <h3>{road.name}</h3>
+                  <h3>{road.name ?? road.code}</h3>
                   <p>{road.latest_condition?.details ?? "Sin observaciones"}</p>
                 </div>
                 <div className="road-status">

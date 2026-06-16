@@ -14,23 +14,105 @@ CREATE TABLE IF NOT EXISTS ski_resorts (
 
 CREATE TABLE IF NOT EXISTS roads (
     id SERIAL PRIMARY KEY,
-    resort_id INT REFERENCES ski_resorts(id) ON DELETE SET NULL,
-    name VARCHAR(100) NOT NULL,
-    route GEOMETRY(LineString, 4326) NOT NULL,
+    code VARCHAR(30) NOT NULL,
+    name VARCHAR(150),
+    route GEOMETRY(LineString, 4326),
     data_source VARCHAR(100) NOT NULL DEFAULT 'manual',
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_roads_resort_name UNIQUE (resort_id, name)
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_roads_code_source UNIQUE (code, data_source)
+);
+
+CREATE TABLE IF NOT EXISTS resort_access_roads (
+    id SERIAL PRIMARY KEY,
+    resort_id INT NOT NULL REFERENCES ski_resorts(id) ON DELETE CASCADE,
+    road_id INT NOT NULL REFERENCES roads(id) ON DELETE CASCADE,
+    access_role VARCHAR(50) NOT NULL DEFAULT 'primary',
+    segment_description TEXT,
+    from_km DECIMAL(8,3),
+    to_km DECIMAL(8,3),
+    priority INT NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    data_source VARCHAR(100) NOT NULL DEFAULT 'manual',
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_resort_access_roads UNIQUE (
+        resort_id,
+        road_id,
+        access_role,
+        from_km,
+        to_km
+    ),
+    CONSTRAINT chk_resort_access_roads_role CHECK (
+        access_role IN ('primary', 'secondary', 'alternative', 'approach', 'final_access')
+    ),
+    CONSTRAINT chk_resort_access_roads_km CHECK (
+        from_km IS NULL OR to_km IS NULL OR from_km <= to_km
+    )
 );
 
 CREATE TABLE IF NOT EXISTS road_conditions (
     id SERIAL PRIMARY KEY,
     road_id INT NOT NULL REFERENCES roads(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL,
+    severity VARCHAR(50) NOT NULL DEFAULT 'unknown',
     details TEXT,
     data_source VARCHAR(100) NOT NULL DEFAULT 'manual',
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    source_updated_at TIMESTAMP WITH TIME ZONE,
+    raw_payload JSONB,
     reported_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS road_incidents (
+    id SERIAL PRIMARY KEY,
+    road_id INT REFERENCES roads(id) ON DELETE SET NULL,
+    source VARCHAR(100) NOT NULL,
+    source_id VARCHAR(255),
+    road_code VARCHAR(30),
+    title VARCHAR(255),
+    description TEXT,
+    incident_type VARCHAR(80) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
+    severity VARCHAR(50) NOT NULL DEFAULT 'unknown',
+    start_km DECIMAL(8,3),
+    end_km DECIMAL(8,3),
+    direction VARCHAR(100),
+    location GEOMETRY(Point, 4326),
+    affected_route GEOMETRY(LineString, 4326),
+    starts_at TIMESTAMP WITH TIME ZONE,
+    ends_at TIMESTAMP WITH TIME ZONE,
+    reported_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    raw_payload JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_road_incidents_source_source_id UNIQUE (source, source_id),
+    CONSTRAINT chk_road_incidents_status CHECK (
+        status IN ('active', 'planned', 'resolved', 'unknown')
+    ),
+    CONSTRAINT chk_road_incidents_severity CHECK (
+        severity IN ('low', 'medium', 'high', 'critical', 'unknown')
+    ),
+    CONSTRAINT chk_road_incidents_km CHECK (
+        start_km IS NULL OR end_km IS NULL OR start_km <= end_km
+    )
+);
+
+CREATE TABLE IF NOT EXISTS road_alternatives (
+    id SERIAL PRIMARY KEY,
+    resort_id INT NOT NULL REFERENCES ski_resorts(id) ON DELETE CASCADE,
+    affected_road_id INT REFERENCES roads(id) ON DELETE SET NULL,
+    alternative_road_id INT REFERENCES roads(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    priority INT NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    data_source VARCHAR(100) NOT NULL DEFAULT 'manual',
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS snow_reports (
@@ -106,9 +188,21 @@ CREATE TABLE IF NOT EXISTS weather_alerts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ski_resorts_location ON ski_resorts USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_roads_code ON roads(code);
 CREATE INDEX IF NOT EXISTS idx_roads_route ON roads USING GIST(route);
-CREATE INDEX IF NOT EXISTS idx_roads_resort_id ON roads(resort_id);
+CREATE INDEX IF NOT EXISTS idx_resort_access_roads_resort_id ON resort_access_roads(resort_id);
+CREATE INDEX IF NOT EXISTS idx_resort_access_roads_road_id ON resort_access_roads(road_id);
+CREATE INDEX IF NOT EXISTS idx_resort_access_roads_km ON resort_access_roads(road_id, from_km, to_km);
 CREATE INDEX IF NOT EXISTS idx_road_conditions_road_reported_at ON road_conditions(road_id, reported_at DESC);
+CREATE INDEX IF NOT EXISTS idx_road_incidents_road_id ON road_incidents(road_id);
+CREATE INDEX IF NOT EXISTS idx_road_incidents_status ON road_incidents(status);
+CREATE INDEX IF NOT EXISTS idx_road_incidents_road_code ON road_incidents(road_code);
+CREATE INDEX IF NOT EXISTS idx_road_incidents_updated_at ON road_incidents(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_road_incidents_location ON road_incidents USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_road_incidents_affected_route ON road_incidents USING GIST(affected_route);
+CREATE INDEX IF NOT EXISTS idx_road_alternatives_resort_id ON road_alternatives(resort_id);
+CREATE INDEX IF NOT EXISTS idx_road_alternatives_affected_road_id ON road_alternatives(affected_road_id);
+CREATE INDEX IF NOT EXISTS idx_road_alternatives_alternative_road_id ON road_alternatives(alternative_road_id);
 CREATE INDEX IF NOT EXISTS idx_snow_reports_resort_reported_at ON snow_reports(resort_id, reported_at DESC);
 CREATE INDEX IF NOT EXISTS idx_weather_reports_resort_reported_at ON weather_reports(resort_id, reported_at DESC);
 CREATE INDEX IF NOT EXISTS idx_weather_alerts_expires ON weather_alerts(expires);
