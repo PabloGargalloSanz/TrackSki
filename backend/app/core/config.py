@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     DB_PASSWORD: str 
     DATABASE_URL: str | None = None
     AEMET_API_KEY: str | None = None
+    DGT_DATEX2_URL: str = (
+        "https://nap.dgt.es/datex2/v3/dgt/SituationPublication/datex2_v37.xml"
+    )
+    DGT_DATEX2_TIMEOUT_SECONDS: int = 30
 
     model_config = SettingsConfigDict(
         env_file=ROOT_DIR / ".env",

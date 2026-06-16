@@ -5,6 +5,8 @@ from typing import Any
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.scrapers.dgt_datex2 import NormalizedRoadIncident
+
 
 def get_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
     result = db.execute(
@@ -66,6 +68,32 @@ def get_road_by_id(db: Session, road_id: int) -> dict | None:
 
     row = result.mappings().one_or_none()
     return dict(row) if row else None
+
+
+def get_best_road_id_by_code(db: Session, road_code: str) -> int | None:
+    result = db.execute(
+        text(
+            """
+            SELECT id
+            FROM roads
+            WHERE code = :road_code
+              AND data_source IN ('manual', 'dgt_datex2_v37', 'dgt')
+            ORDER BY
+                is_verified DESC,
+                CASE data_source
+                    WHEN 'manual' THEN 1
+                    WHEN 'dgt_datex2_v37' THEN 2
+                    WHEN 'dgt' THEN 3
+                    ELSE 4
+                END,
+                id
+            LIMIT 1
+            """
+        ),
+        {"road_code": road_code},
+    )
+
+    return result.scalar_one_or_none()
 
 
 def get_latest_road_condition_by_road_id(db: Session, road_id: int) -> dict | None:
@@ -150,6 +178,110 @@ def create_road_condition(
                 json.dumps(raw_payload) if raw_payload is not None else None
             ),
             "reported_at": reported_at,
+        },
+    )
+
+    return result.scalar_one()
+
+
+def upsert_road_incident(
+    db: Session,
+    incident: NormalizedRoadIncident,
+    road_id: int | None,
+) -> int:
+    result = db.execute(
+        text(
+            """
+            INSERT INTO road_incidents (
+                road_id,
+                source,
+                source_id,
+                road_code,
+                title,
+                description,
+                incident_type,
+                status,
+                severity,
+                start_km,
+                end_km,
+                direction,
+                location,
+                starts_at,
+                ends_at,
+                reported_at,
+                updated_at,
+                raw_payload
+            )
+            VALUES (
+                :road_id,
+                :source,
+                :source_id,
+                :road_code,
+                :title,
+                :description,
+                :incident_type,
+                :status,
+                :severity,
+                :start_km,
+                :end_km,
+                :direction,
+                CASE
+                    WHEN :longitude IS NULL OR :latitude IS NULL THEN NULL
+                    ELSE ST_SetSRID(
+                        ST_MakePoint(:longitude, :latitude),
+                        4326
+                    )
+                END,
+                :starts_at,
+                :ends_at,
+                :reported_at,
+                COALESCE(
+                    CAST(:updated_at AS TIMESTAMP WITH TIME ZONE),
+                    CURRENT_TIMESTAMP
+                ),
+                CAST(:raw_payload AS JSONB)
+            )
+            ON CONFLICT (source, source_id)
+            DO UPDATE SET
+                road_id = EXCLUDED.road_id,
+                road_code = EXCLUDED.road_code,
+                title = EXCLUDED.title,
+                description = EXCLUDED.description,
+                incident_type = EXCLUDED.incident_type,
+                status = EXCLUDED.status,
+                severity = EXCLUDED.severity,
+                start_km = EXCLUDED.start_km,
+                end_km = EXCLUDED.end_km,
+                direction = EXCLUDED.direction,
+                location = EXCLUDED.location,
+                starts_at = EXCLUDED.starts_at,
+                ends_at = EXCLUDED.ends_at,
+                reported_at = EXCLUDED.reported_at,
+                updated_at = EXCLUDED.updated_at,
+                raw_payload = EXCLUDED.raw_payload
+            RETURNING id
+            """
+        ),
+        {
+            "road_id": road_id,
+            "source": incident.source,
+            "source_id": incident.source_id,
+            "road_code": incident.road_code,
+            "title": incident.title,
+            "description": incident.description,
+            "incident_type": incident.incident_type,
+            "status": incident.status,
+            "severity": incident.severity,
+            "start_km": incident.start_km,
+            "end_km": incident.end_km,
+            "direction": incident.direction,
+            "latitude": incident.latitude,
+            "longitude": incident.longitude,
+            "starts_at": incident.starts_at,
+            "ends_at": incident.ends_at,
+            "reported_at": incident.reported_at,
+            "updated_at": incident.updated_at,
+            "raw_payload": json.dumps(incident.raw_payload),
         },
     )
 
