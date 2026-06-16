@@ -1,7 +1,9 @@
 from decimal import Decimal
+from unittest.mock import Mock, patch
 import unittest
 
 from app.scrapers.dgt_datex2 import (
+    download_datex2_xml,
     extract_km_range,
     extract_road_code,
     make_stable_source_id,
@@ -13,6 +15,20 @@ from app.scrapers.dgt_datex2 import (
 
 
 class DgtDatex2NormalizationTest(unittest.TestCase):
+    def test_download_datex2_xml(self) -> None:
+        response = Mock()
+        response.content = b"<xml />"
+
+        with patch("app.scrapers.dgt_datex2.httpx.get", return_value=response) as get:
+            content = download_datex2_xml(
+                url="https://example.test/datex2.xml",
+                timeout_seconds=5,
+            )
+
+        self.assertEqual(content, b"<xml />")
+        response.raise_for_status.assert_called_once_with()
+        get.assert_called_once_with("https://example.test/datex2.xml", timeout=5)
+
     def test_extract_road_code(self) -> None:
         self.assertEqual(
             extract_road_code("Incidencia en A-136 sentido Francia"),

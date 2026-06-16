@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 import hashlib
+import httpx
 import re
 import unicodedata
 from typing import Any
@@ -9,6 +10,9 @@ from xml.etree import ElementTree
 
 
 SOURCE = "dgt_datex2_v37"
+DEFAULT_DATEX2_URL = (
+    "https://nap.dgt.es/datex2/v3/dgt/SituationPublication/datex2_v37.xml"
+)
 
 ROAD_CODE_PATTERN = re.compile(
     r"\b(AP|A|N|M|C|B|GI|L|T|V|CV|CM|CL|EX|GR|H|HU|LE|LO|LU|MA|NA|O|OU|P|PO|"
@@ -43,6 +47,15 @@ class NormalizedRoadIncident:
     reported_at: datetime | None
     updated_at: datetime | None
     raw_payload: dict[str, Any]
+
+
+def download_datex2_xml(
+    url: str = DEFAULT_DATEX2_URL,
+    timeout_seconds: int = 30,
+) -> bytes:
+    response = httpx.get(url, timeout=timeout_seconds)
+    response.raise_for_status()
+    return response.content
 
 
 def normalize_text(value: str | None) -> str:
