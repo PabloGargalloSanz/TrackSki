@@ -357,11 +357,18 @@ por nieve, viento, lluvia o temperaturas. Requiere configurar:
 AEMET_API_KEY=
 ```
 
-Actualmente se puede ingerir avisos por area:
+Actualmente se puede ingerir avisos por areas concretas:
 
 ```bash
 cd backend
 python -m app.commands.ingest_alerts --area 62
+```
+
+Tambien se puede omitir `--area` para que el comando derive las areas AEMET
+unicas a partir de las estaciones configuradas:
+
+```bash
+python -m app.commands.ingest_alerts
 ```
 
 Areas utiles como referencia:
@@ -403,10 +410,17 @@ python -m app.jobs.refresh_real_data --alerts --area 62
 python -m app.jobs.refresh_real_data --roads
 ```
 
+Si no se pasa `--area` al ejecutar alertas, el job calcula las areas AEMET
+unicas desde las estaciones configuradas y hace una peticion por area, no por
+estacion:
+
+```bash
+python -m app.jobs.refresh_real_data --alerts
+python -m app.jobs.refresh_real_data --all
+```
+
 Si no se pasa ningun flag, el job no ejecuta nada y muestra un error claro. Se
-hace asi para evitar refrescos completos por accidente. Para AEMET se debe
-pasar `--area`, porque el area depende de la zona de la estacion y todavia no
-existe una relacion automatica estacion-area.
+hace asi para evitar refrescos completos por accidente.
 
 El agrupador no duplica la logica de ingesta: reutiliza los comandos y jobs ya
 existentes:
@@ -445,8 +459,9 @@ DGT_DATEX2_TIMEOUT_SECONDS=
 Limitaciones actuales:
 
 - No hay cron, systemd timer, Celery ni APScheduler.
-- AEMET requiere indicar area manualmente.
-- Mas adelante habra que modelar la relacion entre estacion y area AEMET.
+- AEMET resuelve areas desde regiones conocidas de estaciones.
+- Mas adelante habra que mejorar esa relacion estacion-area AEMET con datos
+  reales y no solo por region.
 - DGT solo guarda incidencias de carreteras configuradas en `roads`.
 
 ## 11. Arquitectura de despliegue

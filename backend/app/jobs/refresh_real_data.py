@@ -18,9 +18,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--roads", action="store_true", help="Ejecuta incidencias DGT.")
     parser.add_argument(
         "--area",
+        action="append",
         help=(
-            "Area AEMET para avisos, por ejemplo 62. Obligatoria si se ejecuta "
-            "AEMET; mas adelante se resolvera por estacion."
+            "Area AEMET para avisos, por ejemplo 62. Se puede repetir. "
+            "Si se omite, se resuelve desde las estaciones configuradas."
         ),
     )
     parser.add_argument(
@@ -45,14 +46,8 @@ def selected_jobs(args: argparse.Namespace) -> list[tuple[str, JobRunner]]:
     return jobs
 
 
-def _run_alerts(area: str | None) -> JobResult:
-    if not area:
-        return JobResult.failed(
-            "AEMET alerts",
-            "Falta --area para AEMET. El area depende de la zona/estacion.",
-        )
-
-    return ingest_alerts.run(area=area)
+def _run_alerts(area: list[str] | None) -> JobResult:
+    return ingest_alerts.run(areas=area)
 
 
 def run(args: argparse.Namespace) -> list[JobResult]:

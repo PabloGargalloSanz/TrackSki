@@ -12,7 +12,7 @@ def make_args(
     weather: bool = False,
     alerts: bool = False,
     roads: bool = False,
-    area: str | None = None,
+    area: list[str] | None = None,
     resort_id: int | None = None,
 ) -> argparse.Namespace:
     return argparse.Namespace(
@@ -58,10 +58,10 @@ class RefreshRealDataTest(unittest.TestCase):
         alerts_run.return_value = JobResult(job_name="AEMET alerts")
         roads_run.return_value = JobResult(job_name="DGT roads")
 
-        results = run(make_args(alerts=True, area="62"))
+        results = run(make_args(alerts=True, area=["62"]))
 
         self.assertEqual([result.job_name for result in results], ["AEMET alerts"])
-        alerts_run.assert_called_once_with(area="62")
+        alerts_run.assert_called_once_with(areas=["62"])
         weather_run.assert_not_called()
         roads_run.assert_not_called()
 
@@ -78,7 +78,7 @@ class RefreshRealDataTest(unittest.TestCase):
         alerts_run.side_effect = RuntimeError("AEMET unavailable")
         roads_run.return_value = JobResult(job_name="DGT roads")
 
-        results = run(make_args(all=True, area="62"))
+        results = run(make_args(all=True, area=["62"]))
 
         self.assertEqual(len(results), 3)
         self.assertEqual(results[0].status, "success")
@@ -87,12 +87,13 @@ class RefreshRealDataTest(unittest.TestCase):
         self.assertEqual(results[2].status, "success")
 
     @patch("app.jobs.refresh_real_data.ingest_alerts.run")
-    def test_alerts_requires_area(self, alerts_run: Mock) -> None:
+    def test_alerts_can_run_without_manual_area(self, alerts_run: Mock) -> None:
+        alerts_run.return_value = JobResult(job_name="AEMET alerts")
+
         results = run(make_args(alerts=True))
 
-        self.assertEqual(results[0].status, "failed")
-        self.assertIn("Falta --area", results[0].message)
-        alerts_run.assert_not_called()
+        self.assertEqual(results[0].status, "success")
+        alerts_run.assert_called_once_with(areas=None)
 
 
 if __name__ == "__main__":
