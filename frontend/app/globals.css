@@ -255,11 +255,24 @@ h1 {
   margin-top: 16px;
 }
 
+.alerts-section {
+  margin-top: 16px;
+}
+
+.alert-list,
+.incident-list,
+.alternative-list {
+  display: grid;
+}
+
 .road-list {
   display: grid;
 }
 
-.road-row {
+.alert-row,
+.road-row,
+.incident-row,
+.alternative-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -268,16 +281,46 @@ h1 {
   border-bottom: 1px solid #e3e9ee;
 }
 
-.road-row:last-child {
+.alert-row:last-child,
+.road-row:last-child,
+.incident-row:last-child,
+.alternative-row:last-child {
   padding-bottom: 0;
   border-bottom: 0;
 }
 
-.road-row h3 {
+.alert-row h3,
+.road-row h3,
+.incident-list h3,
+.alternative-list h3,
+.incident-row h4,
+.alternative-row h4 {
+  margin: 0;
+}
+
+.alert-row h3,
+.road-row h3,
+.incident-list h3,
+.alternative-list h3 {
   font-size: 17px;
 }
 
+.incident-list,
+.alternative-list {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e3e9ee;
+}
+
+.incident-row h4,
+.alternative-row h4 {
+  font-size: 15px;
+}
+
+.alert-row p,
 .road-row p,
+.incident-row p,
+.alternative-row p,
 .empty-message {
   margin: 6px 0 0;
   color: var(--muted);
@@ -289,6 +332,72 @@ h1 {
   flex: none;
   gap: 5px;
   text-align: right;
+}
+
+.alert-validity {
+  display: grid;
+  flex: none;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.inline-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.meta-line {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.severity-pill,
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #c8d3dc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.severity-pill--rojo,
+.severity-pill--critical,
+.status-chip--closed {
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+.severity-pill--naranja,
+.severity-pill--high,
+.status-chip--chains {
+  border-color: #ea580c;
+  color: #9a3412;
+}
+
+.severity-pill--amarillo,
+.severity-pill--medium,
+.status-chip--affected {
+  border-color: #d3a72c;
+  color: #765b0a;
+}
+
+.severity-pill--low,
+.status-chip--caution {
+  border-color: #59a99f;
+  color: var(--accent-strong);
+}
+
+.status-chip--open {
+  border-color: #16a34a;
+  color: #166534;
 }
 
 @media (max-width: 680px) {
@@ -315,12 +424,16 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .road-row {
+  .alert-row,
+  .road-row,
+  .incident-row,
+  .alternative-row {
     flex-direction: column;
     gap: 12px;
   }
 
-  .road-status {
+  .road-status,
+  .alert-validity {
     text-align: left;
   }
 

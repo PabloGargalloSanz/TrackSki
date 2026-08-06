@@ -24,6 +24,7 @@ class WeatherAlertsRepositoryTest(unittest.TestCase):
         self.assertIn("WHEN 'rojo' THEN 1", sql)
         self.assertIn("WHEN 'naranja' THEN 2", sql)
         self.assertIn("WHEN 'amarillo' THEN 3", sql)
+        self.assertIn("onset IS NULL OR onset <= CURRENT_TIMESTAMP", sql)
         self.assertIn("expires IS NULL OR expires >= CURRENT_TIMESTAMP", sql)
         self.assertNotIn("raw_payload", sql)
         self.assertEqual(params["area"], "%Pirineo%")

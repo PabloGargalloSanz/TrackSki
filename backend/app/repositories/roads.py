@@ -515,6 +515,7 @@ def get_access_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
 def get_active_road_incidents_for_road_ids(
     db: Session,
     road_ids: list[int],
+    limit: int = 50,
 ) -> list[dict]:
     if not road_ids:
         return []
@@ -543,6 +544,15 @@ def get_active_road_incidents_for_road_ids(
             FROM road_incidents
             WHERE status IN ('active', 'planned')
               AND road_id IN :road_ids
+              AND updated_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
+              AND NOT (
+                  severity = 'unknown'
+                  AND incident_type IN ('unknown', 'other')
+                  AND title IS NULL
+                  AND description IS NULL
+                  AND start_km IS NULL
+                  AND end_km IS NULL
+              )
             ORDER BY
                 CASE severity
                     WHEN 'critical' THEN 1
@@ -553,12 +563,13 @@ def get_active_road_incidents_for_road_ids(
                 END,
                 updated_at DESC,
                 id DESC
+            LIMIT :limit
         """
     ).bindparams(bindparam("road_ids", expanding=True))
 
     result = db.execute(
         statement,
-        {"road_ids": road_ids},
+        {"road_ids": road_ids, "limit": limit},
     )
 
     return [dict(row) for row in result.mappings()]

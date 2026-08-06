@@ -213,7 +213,7 @@ def build_resort_access_status(
 ) -> ResortAccessStatusResponse:
     access_roads = get_access_roads_by_resort_id(db, resort_id)
     road_ids = [row["road_id"] for row in access_roads]
-    incidents = get_active_road_incidents_for_road_ids(db, road_ids)
+    incidents = get_active_road_incidents_for_road_ids(db, road_ids, limit=30)
 
     affected_incidents = []
     for incident in incidents:

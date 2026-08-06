@@ -5,6 +5,7 @@ import unittest
 
 from app.repositories.roads import (
     create_road_condition,
+    get_active_road_incidents_for_road_ids,
     get_best_road_id_by_code,
     upsert_road_condition_summary,
     upsert_road_incident,
@@ -54,6 +55,24 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(road_id, 7)
         _, params = db.execute.call_args.args
         self.assertEqual(params["road_code"], "A-136")
+
+    def test_get_active_road_incidents_for_access_filters_noise(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.mappings.return_value = []
+        db.execute.return_value = result
+
+        incidents = get_active_road_incidents_for_road_ids(db, [1, 2], limit=30)
+
+        self.assertEqual(incidents, [])
+        statement, params = db.execute.call_args.args
+        sql = str(statement)
+        self.assertIn("updated_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'", sql)
+        self.assertIn("severity = 'unknown'", sql)
+        self.assertIn("incident_type IN ('unknown', 'other')", sql)
+        self.assertIn("LIMIT :limit", sql)
+        self.assertEqual(params["road_ids"], [1, 2])
+        self.assertEqual(params["limit"], 30)
 
     def test_upsert_road_incident_returns_saved_id(self) -> None:
         db = Mock()

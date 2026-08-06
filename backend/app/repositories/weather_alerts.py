@@ -14,6 +14,7 @@ def get_active_weather_alerts(
     limit: int = 100,
 ) -> list[dict]:
     filters = [
+        "(onset IS NULL OR onset <= CURRENT_TIMESTAMP)",
         "(expires IS NULL OR expires >= CURRENT_TIMESTAMP)",
         "level <> 'verde'",
     ]

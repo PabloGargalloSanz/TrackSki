@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getResortSummary } from "../../../lib/api";
+import { getResortSummary, type RoadIncident } from "../../../lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,18 @@ function formatDate(value: string): string {
 
 function valueOrDash(value: number | string | null, suffix = ""): string {
   return value === null ? "-" : `${value}${suffix}`;
+}
+
+function kmRange(incident: RoadIncident): string {
+  if (incident.start_km === null && incident.end_km === null) {
+    return "Tramo sin km informado";
+  }
+
+  if (incident.start_km === incident.end_km || incident.end_km === null) {
+    return `km ${incident.start_km}`;
+  }
+
+  return `km ${incident.start_km} - ${incident.end_km}`;
 }
 
 export default async function ResortDetailPage({
@@ -55,8 +67,13 @@ export default async function ResortDetailPage({
     notFound();
   }
 
-  const { resort, latest_snow_report: snow, latest_weather_report: weather } =
-    summary;
+  const {
+    resort,
+    latest_snow_report: snow,
+    latest_weather_report: weather,
+    weather_alerts: alerts,
+    access_status: accessStatus,
+  } = summary;
 
   return (
     <main className="page">
@@ -186,22 +203,71 @@ export default async function ResortDetailPage({
         </section>
       </div>
 
+      <section className="detail-section alerts-section">
+        <div className="section-heading">
+          <h2>Avisos oficiales</h2>
+        </div>
+        {alerts.length > 0 ? (
+          <div className="alert-list">
+            {alerts.map((alert) => (
+              <article className="alert-row" key={alert.id}>
+                <div>
+                  <div className="inline-heading">
+                    <span className={`severity-pill severity-pill--${alert.level}`}>
+                      {alert.level}
+                    </span>
+                    <h3>{alert.event}</h3>
+                  </div>
+                  <p>{alert.headline ?? alert.description ?? alert.area}</p>
+                  <p className="meta-line">{alert.area}</p>
+                </div>
+                <div className="alert-validity">
+                  {alert.onset && <time>Desde {formatDate(alert.onset)}</time>}
+                  {alert.expires && <time>Hasta {formatDate(alert.expires)}</time>}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-message">Sin avisos oficiales activos.</p>
+        )}
+      </section>
+
       <section className="detail-section roads-section">
         <div className="section-heading">
           <h2>Accesos por carretera</h2>
+          <strong className={`status-chip status-chip--${accessStatus.overall_status}`}>
+            {accessStatus.overall_status}
+          </strong>
         </div>
-        {summary.roads.length > 0 ? (
+        {accessStatus.roads.length > 0 ? (
           <div className="road-list">
-            {summary.roads.map((road) => (
-              <article className="road-row" key={road.id}>
+            {accessStatus.roads.map((accessRoad) => (
+              <article className="road-row" key={accessRoad.id}>
                 <div>
-                  <h3>{road.name ?? road.code}</h3>
-                  <p>{road.latest_condition?.details ?? "Sin observaciones"}</p>
+                  <h3>{accessRoad.road.name ?? accessRoad.road.code}</h3>
+                  <p>
+                    {accessRoad.segment_description ??
+                      accessRoad.road.latest_condition?.details ??
+                      "Sin observaciones"}
+                  </p>
+                  <p className="meta-line">
+                    {accessRoad.access_role}
+                    {accessRoad.from_km !== null || accessRoad.to_km !== null
+                      ? ` - ${valueOrDash(accessRoad.from_km)}-${valueOrDash(
+                          accessRoad.to_km,
+                        )} km`
+                      : ""}
+                  </p>
                 </div>
                 <div className="road-status">
-                  <strong>{road.latest_condition?.status ?? "Sin datos"}</strong>
-                  {road.latest_condition && (
-                    <time>{formatDate(road.latest_condition.reported_at)}</time>
+                  <strong>
+                    {accessRoad.road.latest_condition?.status ?? "Sin datos"}
+                  </strong>
+                  {accessRoad.road.latest_condition && (
+                    <time>
+                      {formatDate(accessRoad.road.latest_condition.reported_at)}
+                    </time>
                   )}
                 </div>
               </article>
@@ -211,6 +277,50 @@ export default async function ResortDetailPage({
           <p className="empty-message">
             No hay carreteras asociadas a esta estacion.
           </p>
+        )}
+
+        {accessStatus.incidents.length > 0 ? (
+          <div className="incident-list">
+            <h3>Incidencias activas</h3>
+            {accessStatus.incidents.map((incident) => (
+              <article className="incident-row" key={incident.id}>
+                <div>
+                  <div className="inline-heading">
+                    <span
+                      className={`severity-pill severity-pill--${incident.severity}`}
+                    >
+                      {incident.severity}
+                    </span>
+                    <h4>{incident.title ?? incident.incident_type}</h4>
+                  </div>
+                  <p>{incident.description ?? "Sin descripcion disponible"}</p>
+                  <p className="meta-line">
+                    {incident.road_code ?? "Carretera sin codigo"} -{" "}
+                    {kmRange(incident)}
+                    {incident.access_role ? ` - ${incident.access_role}` : ""}
+                  </p>
+                </div>
+                <div className="road-status">
+                  <strong>{incident.status}</strong>
+                  <time>{formatDate(incident.updated_at)}</time>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-message">Sin incidencias activas conocidas.</p>
+        )}
+
+        {accessStatus.alternatives.length > 0 && (
+          <div className="alternative-list">
+            <h3>Alternativas</h3>
+            {accessStatus.alternatives.map((alternative) => (
+              <article className="alternative-row" key={alternative.id}>
+                <h4>{alternative.title}</h4>
+                <p>{alternative.description}</p>
+              </article>
+            ))}
+          </div>
         )}
       </section>
     </main>
