@@ -143,10 +143,13 @@ def run() -> JobResult:
     return JobResult(
         job_name="DGT roads",
         processed=summary.parsed,
-        inserted=summary.saved,
         updated=summary.road_conditions_updated,
         skipped=summary.skipped + summary.roads_unmatched_skipped,
+        message=(
+            f"Guardadas {summary.saved} incidencias relevantes mediante upsert."
+        ),
         metadata={
+            "saved": summary.saved,
             "roads_matched": summary.roads_matched,
             "roads_unmatched_skipped": summary.roads_unmatched_skipped,
             "source": "dgt_datex2_v37",

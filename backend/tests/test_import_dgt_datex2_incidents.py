@@ -2,7 +2,7 @@ from decimal import Decimal
 from unittest.mock import Mock, patch
 import unittest
 
-from app.jobs.import_dgt_datex2_incidents import save_dgt_incidents
+from app.jobs.import_dgt_datex2_incidents import run, save_dgt_incidents
 from app.scrapers.dgt_datex2 import NormalizedRoadIncident
 
 
@@ -104,6 +104,40 @@ class ImportDgtDatex2IncidentsTest(unittest.TestCase):
         get_best_road_id_by_code.assert_not_called()
         upsert_road_incident.assert_not_called()
         upsert_road_condition_summary.assert_not_called()
+
+    @patch("app.jobs.import_dgt_datex2_incidents.SessionLocal")
+    @patch("app.jobs.import_dgt_datex2_incidents.save_dgt_incidents")
+    @patch("app.jobs.import_dgt_datex2_incidents.parse_datex2_incidents")
+    @patch("app.jobs.import_dgt_datex2_incidents.download_datex2_xml")
+    def test_run_reports_saved_incidents_without_claiming_inserts(
+        self,
+        download_datex2_xml: Mock,
+        parse_datex2_incidents: Mock,
+        save_dgt_incidents_mock: Mock,
+        session_local: Mock,
+    ) -> None:
+        db = Mock()
+        session_local.return_value = db
+        download_datex2_xml.return_value = b"<xml />"
+        parse_datex2_incidents.return_value = []
+        save_dgt_incidents_mock.return_value.parsed = 10
+        save_dgt_incidents_mock.return_value.saved = 3
+        save_dgt_incidents_mock.return_value.skipped = 2
+        save_dgt_incidents_mock.return_value.roads_matched = 3
+        save_dgt_incidents_mock.return_value.roads_unmatched_skipped = 5
+        save_dgt_incidents_mock.return_value.road_conditions_updated = 1
+
+        result = run()
+
+        self.assertEqual(result.status, "success")
+        self.assertEqual(result.processed, 10)
+        self.assertEqual(result.inserted, 0)
+        self.assertEqual(result.updated, 1)
+        self.assertEqual(result.skipped, 7)
+        self.assertEqual(result.metadata["saved"], 3)
+        self.assertIn("Guardadas 3 incidencias", result.message)
+        db.commit.assert_called_once()
+        db.close.assert_called_once()
 
 
 if __name__ == "__main__":
