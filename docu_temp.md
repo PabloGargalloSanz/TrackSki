@@ -385,7 +385,71 @@ Ambas fuentes deben conservarse por separado.
 La ingesta automatica de AEMET tambien queda pendiente para una fase posterior,
 junto con el resto de jobs.
 
-## 10. Arquitectura de despliegue
+## 10. Jobs manuales de datos reales
+
+TrackSki tiene un job agrupador para refrescar datos reales sin automatizarlos
+todavia:
+
+```bash
+cd backend
+python -m app.jobs.refresh_real_data --all --area 62
+```
+
+Tambien se puede ejecutar por partes:
+
+```bash
+python -m app.jobs.refresh_real_data --weather
+python -m app.jobs.refresh_real_data --alerts --area 62
+python -m app.jobs.refresh_real_data --roads
+```
+
+Si no se pasa ningun flag, el job no ejecuta nada y muestra un error claro. Se
+hace asi para evitar refrescos completos por accidente. Para AEMET se debe
+pasar `--area`, porque el area depende de la zona de la estacion y todavia no
+existe una relacion automatica estacion-area.
+
+El agrupador no duplica la logica de ingesta: reutiliza los comandos y jobs ya
+existentes:
+
+- Open-Meteo: `app.commands.ingest_weather`
+- AEMET: `app.commands.ingest_alerts`
+- DGT DATEX2: `app.jobs.import_dgt_datex2_incidents`
+
+Cada fuente devuelve un resumen con estado, procesados, insertados,
+actualizados, omitidos y errores. Si una fuente falla, el agrupador marca esa
+fuente como `failed` y continua con las demas siempre que sea posible.
+
+Comandos existentes que siguen funcionando:
+
+```bash
+python -m app.commands.ingest_weather
+python -m app.commands.ingest_weather --resort-id 1
+python -m app.commands.ingest_alerts --area 62
+python -m app.jobs.import_dgt_datex2_incidents
+```
+
+Datos actualizados:
+
+- `weather_reports` con Open-Meteo.
+- `weather_alerts` con AEMET.
+- `road_incidents` y `road_conditions` con DGT DATEX2.
+
+Variables necesarias:
+
+```env
+AEMET_API_KEY=
+DGT_DATEX2_URL=
+DGT_DATEX2_TIMEOUT_SECONDS=
+```
+
+Limitaciones actuales:
+
+- No hay cron, systemd timer, Celery ni APScheduler.
+- AEMET requiere indicar area manualmente.
+- Mas adelante habra que modelar la relacion entre estacion y area AEMET.
+- DGT solo guarda incidencias de carreteras configuradas en `roads`.
+
+## 11. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -413,7 +477,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 11. Traefik temporal
+## 12. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -445,7 +509,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 12. Staging y main
+## 13. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -483,7 +547,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 13. Despliegue automatico
+## 14. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -509,7 +573,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 14. Comprobaciones
+## 15. Comprobaciones
 
 Estado:
 
@@ -547,7 +611,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 15. Problemas habituales
+## 16. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -580,7 +644,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 16. Migracion futura a 80/443
+## 17. Migracion futura a 80/443
 
 No realizarla todavia.
 

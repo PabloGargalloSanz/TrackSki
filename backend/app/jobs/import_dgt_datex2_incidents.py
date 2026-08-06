@@ -1,4 +1,3 @@
-import sys
 from dataclasses import dataclass
 from xml.etree.ElementTree import ParseError
 
@@ -6,6 +5,7 @@ import httpx
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.jobs.result import JobResult, print_job_result
 from app.repositories.roads import (
     get_best_road_id_by_code,
     upsert_road_condition_summary,
@@ -115,6 +115,12 @@ def _build_condition_details(incidents: list[NormalizedRoadIncident]) -> str:
 
 
 def main() -> int:
+    result = run()
+    print_job_result(result)
+    return 0 if result.status == "success" else 1
+
+
+def run() -> JobResult:
     try:
         xml_content = download_datex2_xml(
             url=settings.DGT_DATEX2_URL,
@@ -122,29 +128,30 @@ def main() -> int:
         )
         incidents = parse_datex2_incidents(xml_content)
     except (httpx.HTTPError, ParseError, ValueError) as error:
-        print(f"ERROR: no se pudieron obtener incidencias DGT: {error}", file=sys.stderr)
-        return 1
+        return JobResult.failed("DGT roads", error)
 
     db = SessionLocal()
     try:
         summary = save_dgt_incidents(db, incidents)
         db.commit()
-    except Exception:
+    except Exception as error:
         db.rollback()
-        raise
+        return JobResult.failed("DGT roads", error)
     finally:
         db.close()
 
-    print(
-        "OK DGT DATEX2: "
-        f"parsed={summary.parsed}, "
-        f"saved={summary.saved}, "
-        f"skipped={summary.skipped}, "
-        f"roads_matched={summary.roads_matched}, "
-        f"roads_unmatched_skipped={summary.roads_unmatched_skipped}, "
-        f"road_conditions_updated={summary.road_conditions_updated}"
+    return JobResult(
+        job_name="DGT roads",
+        processed=summary.parsed,
+        inserted=summary.saved,
+        updated=summary.road_conditions_updated,
+        skipped=summary.skipped + summary.roads_unmatched_skipped,
+        metadata={
+            "roads_matched": summary.roads_matched,
+            "roads_unmatched_skipped": summary.roads_unmatched_skipped,
+            "source": "dgt_datex2_v37",
+        },
     )
-    return 0
 
 
 if __name__ == "__main__":
