@@ -19,6 +19,7 @@ from app.repositories.weather_reports import (
     get_latest_weather_report_by_resort_id,
     get_weather_reports_by_resort_id,
 )
+from app.repositories.weather_alerts import get_active_weather_alerts
 from app.schemas.road import (
     ResortAccessRoad,
     ResortAccessStatusResponse,
@@ -30,12 +31,14 @@ from app.schemas.road import (
 from app.schemas.resort import Coordinates, Resort
 from app.schemas.resort_summary import ResortSummary
 from app.schemas.snow_report import SnowReport, TrailStatus
+from app.schemas.weather_alert import WeatherAlert
 from app.schemas.weather_report import WeatherReport
 from app.services.road_access import (
     km_ranges_overlap,
     most_relevant_access_role,
     overall_access_status,
 )
+from app.services.weather.aemet_areas import get_aemet_area_for_resort
 
 router = APIRouter()
 ReportLimit = Annotated[int, Query(ge=1, le=100)]
@@ -106,6 +109,23 @@ def serialize_weather_report(row: dict) -> WeatherReport:
     )
 
 
+def serialize_weather_alert(row: dict) -> WeatherAlert:
+    return WeatherAlert(
+        id=row["id"],
+        identifier=row["identifier"],
+        level=row["level"],
+        event=row["event"],
+        area=row["area"],
+        onset=row["onset"],
+        expires=row["expires"],
+        headline=row["headline"],
+        description=row["description"],
+        instruction=row["instruction"],
+        data_source=row["data_source"],
+        created_at=row["created_at"],
+    )
+
+
 def serialize_road(row: dict) -> Road:
     latest_condition = None
     if row["latest_status"] and row["latest_reported_at"]:
@@ -147,6 +167,7 @@ def serialize_road_incident(row: dict) -> RoadIncident:
         reported_at=row["reported_at"],
         updated_at=row["updated_at"],
         source=row["source"],
+        access_role=row.get("access_role"),
     )
 
 
@@ -186,63 +207,10 @@ def serialize_road_alternative(row: dict) -> RoadAlternative:
     )
 
 
-@router.get("", response_model=list[Resort])
-def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
-    return [serialize_resort(row) for row in get_resorts(db)]
-
-
-@router.get("/{resort_id}", response_model=Resort)
-def retrieve_resort(resort_id: int, db: Session = Depends(get_db)) -> Resort:
-    resort = get_resort_by_id(db, resort_id)
-    if not resort:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Resort not found",
-        )
-
-    return serialize_resort(resort)
-
-
-@router.get("/{resort_id}/summary", response_model=ResortSummary)
-def retrieve_resort_summary(
+def build_resort_access_status(
+    db: Session,
     resort_id: int,
-    db: Session = Depends(get_db),
-) -> ResortSummary:
-    resort = get_resort_by_id(db, resort_id)
-    if not resort:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Resort not found",
-        )
-
-    snow_report = get_latest_snow_report_by_resort_id(db, resort_id)
-    weather_report = get_latest_weather_report_by_resort_id(db, resort_id)
-    roads = get_roads_by_resort_id(db, resort_id)
-
-    return ResortSummary(
-        resort=serialize_resort(resort),
-        latest_snow_report=(
-            serialize_snow_report(snow_report) if snow_report else None
-        ),
-        latest_weather_report=(
-            serialize_weather_report(weather_report) if weather_report else None
-        ),
-        roads=[serialize_road(row) for row in roads],
-    )
-
-
-@router.get("/{resort_id}/access-status", response_model=ResortAccessStatusResponse)
-def retrieve_resort_access_status(
-    resort_id: int,
-    db: Session = Depends(get_db),
 ) -> ResortAccessStatusResponse:
-    resort = get_resort_by_id(db, resort_id)
-    if not resort:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Resort not found",
-        )
-
     access_roads = get_access_roads_by_resort_id(db, resort_id)
     road_ids = [row["road_id"] for row in access_roads]
     incidents = get_active_road_incidents_for_road_ids(db, road_ids)
@@ -280,6 +248,74 @@ def retrieve_resort_access_status(
         incidents=[serialize_road_incident(row) for row in affected_incidents],
         alternatives=[serialize_road_alternative(row) for row in alternatives],
     )
+
+
+@router.get("", response_model=list[Resort])
+def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
+    return [serialize_resort(row) for row in get_resorts(db)]
+
+
+@router.get("/{resort_id}", response_model=Resort)
+def retrieve_resort(resort_id: int, db: Session = Depends(get_db)) -> Resort:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return serialize_resort(resort)
+
+
+@router.get("/{resort_id}/summary", response_model=ResortSummary)
+def retrieve_resort_summary(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> ResortSummary:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    snow_report = get_latest_snow_report_by_resort_id(db, resort_id)
+    weather_report = get_latest_weather_report_by_resort_id(db, resort_id)
+    roads = get_roads_by_resort_id(db, resort_id)
+    aemet_area = get_aemet_area_for_resort(resort)
+    weather_alerts = (
+        get_active_weather_alerts(db, areas=[aemet_area])
+        if aemet_area
+        else []
+    )
+
+    return ResortSummary(
+        resort=serialize_resort(resort),
+        latest_snow_report=(
+            serialize_snow_report(snow_report) if snow_report else None
+        ),
+        latest_weather_report=(
+            serialize_weather_report(weather_report) if weather_report else None
+        ),
+        roads=[serialize_road(row) for row in roads],
+        weather_alerts=[serialize_weather_alert(row) for row in weather_alerts],
+        access_status=build_resort_access_status(db, resort_id),
+    )
+
+
+@router.get("/{resort_id}/access-status", response_model=ResortAccessStatusResponse)
+def retrieve_resort_access_status(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> ResortAccessStatusResponse:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return build_resort_access_status(db, resort_id)
 
 
 @router.get("/{resort_id}/snow-reports/latest", response_model=SnowReport)

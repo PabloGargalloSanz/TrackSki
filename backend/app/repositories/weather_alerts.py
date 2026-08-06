@@ -1,4 +1,5 @@
 from sqlalchemy import text
+from sqlalchemy import bindparam
 from sqlalchemy.orm import Session
 
 from app.services.weather.alerts import WeatherAlert
@@ -8,6 +9,7 @@ def get_active_weather_alerts(
     db: Session,
     *,
     area: str | None = None,
+    areas: list[str] | None = None,
     level: str | None = None,
     limit: int = 100,
 ) -> list[dict]:
@@ -19,14 +21,16 @@ def get_active_weather_alerts(
     if area:
         filters.append("area ILIKE :area")
         params["area"] = f"%{area}%"
+    if areas:
+        filters.append("area IN :areas")
+        params["areas"] = areas
     if level:
         filters.append("level = :level")
         params["level"] = level
 
     where_clause = " AND ".join(filters)
-    result = db.execute(
-        text(
-            f"""
+    statement = text(
+        f"""
             SELECT
                 id,
                 identifier,
@@ -54,7 +58,12 @@ def get_active_weather_alerts(
                 id DESC
             LIMIT :limit
             """
-        ),
+    )
+    if areas:
+        statement = statement.bindparams(bindparam("areas", expanding=True))
+
+    result = db.execute(
+        statement,
         params,
     )
 

@@ -229,6 +229,10 @@ GET /resorts
 GET /resorts/{id}/summary
 ```
 
+`GET /resorts/{id}/summary` es la fuente principal de la ficha de estacion e
+incluye nieve, meteorologia, avisos AEMET aplicables, carreteras y estado
+completo de accesos.
+
 ## 7. Carreteras y accesos
 
 El modelo separa carretera, acceso e incidencia para evitar duplicar la misma

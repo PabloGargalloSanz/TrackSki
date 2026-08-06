@@ -30,6 +30,19 @@ class WeatherAlertsRepositoryTest(unittest.TestCase):
         self.assertEqual(params["level"], "naranja")
         self.assertEqual(params["limit"], 50)
 
+    def test_get_active_weather_alerts_filters_by_area_list(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.mappings.return_value = []
+        db.execute.return_value = result
+
+        get_active_weather_alerts(db, areas=["62", "69"])
+
+        statement, params = db.execute.call_args.args
+        sql = str(statement)
+        self.assertIn("area IN", sql)
+        self.assertEqual(params["areas"], ["62", "69"])
+
 
 if __name__ == "__main__":
     unittest.main()
