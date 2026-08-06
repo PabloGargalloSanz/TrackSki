@@ -213,6 +213,7 @@ GET /resorts/{id}/access-status
 GET /roads
 GET /roads/incidents/active
 GET /roads/{id}/conditions/latest
+GET /weather/alerts/active
 ```
 
 Los historicos de nieve y meteorologia aceptan `limit`, entre 1 y 100:
@@ -296,6 +297,9 @@ GET /roads/incidents/active
 GET /roads/incidents/active?road_code=A-23
 GET /roads/incidents/active?severity=high
 GET /resorts/{id}/access-status
+GET /weather/alerts/active
+GET /weather/alerts/active?level=naranja
+GET /weather/alerts/active?area=Pirineo
 ```
 
 DGT DATEX2 no cubre Cataluna ni Pais Vasco. Esas fuentes quedan para una fase
