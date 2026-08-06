@@ -4,6 +4,9 @@ import unittest
 
 from app.scrapers.dgt_datex2 import (
     download_datex2_xml,
+    extract_datex2_km,
+    extract_datex2_point,
+    extract_direction,
     extract_km_range,
     extract_road_code,
     make_stable_source_id,
@@ -51,6 +54,24 @@ class DgtDatex2NormalizationTest(unittest.TestCase):
         self.assertEqual(
             extract_km_range("del km 20 al 10"),
             (Decimal("10"), Decimal("20")),
+        )
+
+    def test_extracts_fields_from_dgt_technical_text(self) -> None:
+        text = (
+            "112_112_GV 2026-08-06T12:06:11.000+02:00 certain 112 active "
+            "obstruction objectOnTheRoad ayora N-330 northEastBound "
+            "nonLinkedPoint 39.231632 -1.0751014 Comunitat Valenciana "
+            "137.703 Cofrentes Valencia positive incident"
+        )
+
+        self.assertEqual(extract_direction(text), "northEastBound")
+        self.assertEqual(
+            extract_datex2_point(text),
+            (Decimal("39.231632"), Decimal("-1.0751014")),
+        )
+        self.assertEqual(
+            extract_datex2_km(text),
+            (Decimal("137.703"), Decimal("137.703")),
         )
 
     def test_normalize_incident_type(self) -> None:
@@ -181,8 +202,41 @@ class DgtDatex2NormalizationTest(unittest.TestCase):
         self.assertEqual(len(incidents), 1)
         incident = incidents[0]
         self.assertEqual(incident.road_code, "CV-655")
-        self.assertIsNone(incident.description)
+        self.assertEqual(incident.incident_type, "obstruction")
+        self.assertEqual(incident.severity, "low")
+        self.assertIsNotNone(incident.description)
         self.assertIn("CV-655", incident.raw_payload["search_text"])
+
+    def test_parse_datex2_fills_columns_from_generic_situation_record(self) -> None:
+        text = (
+            "112_112_GV 2026-08-06T12:06:11.000+02:00 certain 112 active "
+            "2026-08-06T12:03:00.000+02:00 obstruction objectOnTheRoad "
+            "ayora N-330 northEastBound nonLinkedPoint 39.231632 -1.0751014 "
+            "Comunitat Valenciana 137.703 Cofrentes Valencia positive incident"
+        )
+        xml = f"""
+        <d2:payload xmlns:d2="http://datex2.eu/schema/3/common">
+          <d2:situationRecord id="26392454">
+            <d2:value>{text}</d2:value>
+          </d2:situationRecord>
+        </d2:payload>
+        """
+
+        incidents = parse_datex2_incidents(xml)
+
+        self.assertEqual(len(incidents), 1)
+        incident = incidents[0]
+        self.assertEqual(incident.source_id, "26392454")
+        self.assertEqual(incident.road_code, "N-330")
+        self.assertEqual(incident.incident_type, "obstruction")
+        self.assertEqual(incident.severity, "low")
+        self.assertEqual(incident.start_km, Decimal("137.703"))
+        self.assertEqual(incident.end_km, Decimal("137.703"))
+        self.assertEqual(incident.direction, "northEastBound")
+        self.assertEqual(incident.latitude, Decimal("39.231632"))
+        self.assertEqual(incident.longitude, Decimal("-1.0751014"))
+        self.assertEqual(incident.title, "Obstaculo en la calzada en N-330")
+        self.assertIn("km 137.703", incident.description)
 
 
 if __name__ == "__main__":
