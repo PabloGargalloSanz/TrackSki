@@ -7,6 +7,7 @@ from app.repositories.roads import (
     create_road_condition,
     get_active_road_incidents_for_road_ids,
     get_best_road_id_by_code,
+    mark_stale_dgt_incidents_resolved,
     upsert_road_condition_summary,
     upsert_road_incident,
 )
@@ -73,6 +74,30 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertIn("LIMIT :limit", sql)
         self.assertEqual(params["road_ids"], [1, 2])
         self.assertEqual(params["limit"], 30)
+
+    def test_mark_stale_dgt_incidents_resolved_returns_updated_count(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.fetchall.return_value = [(1,), (2,)]
+        db.execute.return_value = result
+
+        updated = mark_stale_dgt_incidents_resolved(db, ["record-1", "record-2"])
+
+        self.assertEqual(updated, 2)
+        statement, params = db.execute.call_args.args
+        sql = str(statement)
+        self.assertIn("UPDATE road_incidents", sql)
+        self.assertIn("status = 'resolved'", sql)
+        self.assertIn("source_id NOT IN", sql)
+        self.assertEqual(params["current_source_ids"], ["record-1", "record-2"])
+
+    def test_mark_stale_dgt_incidents_resolved_skips_empty_source_ids(self) -> None:
+        db = Mock()
+
+        updated = mark_stale_dgt_incidents_resolved(db, [])
+
+        self.assertEqual(updated, 0)
+        db.execute.assert_not_called()
 
     def test_upsert_road_incident_returns_saved_id(self) -> None:
         db = Mock()

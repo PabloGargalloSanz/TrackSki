@@ -406,6 +406,30 @@ def upsert_road_incident(
     return result.scalar_one()
 
 
+def mark_stale_dgt_incidents_resolved(
+    db: Session,
+    current_source_ids: list[str],
+) -> int:
+    if not current_source_ids:
+        return 0
+
+    statement = text(
+        """
+            UPDATE road_incidents
+            SET
+                status = 'resolved',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE source = 'dgt_datex2_v37'
+              AND status IN ('active', 'planned')
+              AND source_id NOT IN :current_source_ids
+            RETURNING id
+        """
+    ).bindparams(bindparam("current_source_ids", expanding=True))
+
+    result = db.execute(statement, {"current_source_ids": current_source_ids})
+    return len(result.fetchall())
+
+
 def get_active_road_incidents(
     db: Session,
     *,

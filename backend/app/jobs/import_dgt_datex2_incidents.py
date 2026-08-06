@@ -8,6 +8,7 @@ from app.db.session import SessionLocal
 from app.jobs.result import JobResult, print_job_result
 from app.repositories.roads import (
     get_best_road_id_by_code,
+    mark_stale_dgt_incidents_resolved,
     upsert_road_condition_summary,
     upsert_road_incident,
 )
@@ -27,6 +28,7 @@ class ImportSummary:
     roads_matched: int = 0
     roads_unmatched_skipped: int = 0
     road_conditions_updated: int = 0
+    resolved_missing: int = 0
 
 
 def save_dgt_incidents(
@@ -35,6 +37,9 @@ def save_dgt_incidents(
 ) -> ImportSummary:
     summary = ImportSummary(parsed=len(incidents))
     incidents_by_road_id: dict[int, list[NormalizedRoadIncident]] = {}
+    current_source_ids = [
+        incident.source_id for incident in incidents if incident.source_id
+    ]
 
     for incident in incidents:
         if not incident.source_id:
@@ -82,6 +87,11 @@ def save_dgt_incidents(
             },
         )
         summary.road_conditions_updated += 1
+
+    summary.resolved_missing = mark_stale_dgt_incidents_resolved(
+        db,
+        current_source_ids,
+    )
 
     return summary
 
@@ -146,10 +156,12 @@ def run() -> JobResult:
         updated=summary.road_conditions_updated,
         skipped=summary.skipped + summary.roads_unmatched_skipped,
         message=(
-            f"Guardadas {summary.saved} incidencias relevantes mediante upsert."
+            f"Guardadas {summary.saved} incidencias relevantes mediante upsert. "
+            f"Cerradas {summary.resolved_missing} ausentes de DGT."
         ),
         metadata={
             "saved": summary.saved,
+            "resolved_missing": summary.resolved_missing,
             "roads_matched": summary.roads_matched,
             "roads_unmatched_skipped": summary.roads_unmatched_skipped,
             "source": "dgt_datex2_v37",
