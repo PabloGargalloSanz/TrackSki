@@ -52,9 +52,14 @@ def run(area: str) -> JobResult:
     result = JobResult(
         job_name="AEMET alerts",
         processed=len(downloaded_alerts),
-        updated=len(alerts),
         skipped=len(downloaded_alerts) - len(alerts),
-        metadata={"area": area},
+        message=(
+            f"Guardados {len(alerts)} avisos accionables mediante upsert."
+        ),
+        metadata={
+            "area": area,
+            "saved": len(alerts),
+        },
     )
     try:
         for alert in alerts:
