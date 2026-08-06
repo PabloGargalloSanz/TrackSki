@@ -399,14 +399,15 @@ todavia:
 
 ```bash
 cd backend
-python -m app.jobs.refresh_real_data --all --area 62
+python -m app.jobs.refresh_real_data --all
 ```
 
 Tambien se puede ejecutar por partes:
 
 ```bash
 python -m app.jobs.refresh_real_data --weather
-python -m app.jobs.refresh_real_data --alerts --area 62
+python -m app.jobs.refresh_real_data --alerts
+python -m app.jobs.refresh_real_data --alerts --area 62 --area 61
 python -m app.jobs.refresh_real_data --roads
 ```
 
@@ -422,6 +423,13 @@ python -m app.jobs.refresh_real_data --all
 Si no se pasa ningun flag, el job no ejecuta nada y muestra un error claro. Se
 hace asi para evitar refrescos completos por accidente.
 
+Importante: ejecutar varias lineas seguidas en PowerShell lanza varios jobs uno
+detras de otro. Para una prueba normal, ejecutar solo un comando cada vez:
+
+```bash
+python -m app.jobs.refresh_real_data --weather
+```
+
 El agrupador no duplica la logica de ingesta: reutiliza los comandos y jobs ya
 existentes:
 
@@ -429,9 +437,17 @@ existentes:
 - AEMET: `app.commands.ingest_alerts`
 - DGT DATEX2: `app.jobs.import_dgt_datex2_incidents`
 
-Cada fuente devuelve un resumen con estado, procesados, insertados,
-actualizados, omitidos y errores. Si una fuente falla, el agrupador marca esa
-fuente como `failed` y continua con las demas siempre que sea posible.
+Cada fuente devuelve un resumen:
+
+- `processed`: datos leidos desde la fuente.
+- `inserted`: registros insertados solo cuando se puede saber con seguridad.
+- `updated`: resumenes actualizados, por ejemplo `road_conditions`.
+- `saved`: registros guardados mediante upsert; pueden ser nuevos o existentes.
+- `skipped`: datos omitidos por no ser relevantes o estar repetidos.
+- `status`: `success`, `partial` o `failed`.
+
+Si una fuente falla, el agrupador marca esa fuente como `failed` y continua con
+las demas siempre que sea posible.
 
 Comandos existentes que siguen funcionando:
 
@@ -441,6 +457,13 @@ python -m app.commands.ingest_weather --resort-id 1
 python -m app.commands.ingest_alerts --area 62
 python -m app.jobs.import_dgt_datex2_incidents
 ```
+
+Comportamiento por fuente:
+
+- Open-Meteo hace una peticion por estacion porque necesita coordenadas.
+- AEMET hace una peticion por area AEMET unica, no por estacion.
+- DGT hace una peticion global al XML DATEX2 y filtra localmente por carreteras
+  configuradas en `roads`.
 
 Datos actualizados:
 
