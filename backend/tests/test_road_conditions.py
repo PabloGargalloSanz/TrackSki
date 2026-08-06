@@ -117,7 +117,7 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(params["updated_at"], updated_at)
         self.assertEqual(params["raw_payload"], '{"source_id": "record-1"}')
 
-    def test_upsert_road_condition_summary_returns_saved_id(self) -> None:
+    def test_upsert_road_condition_summary_keeps_history(self) -> None:
         db = Mock()
         result = Mock()
         result.scalar_one.return_value = 789
@@ -138,6 +138,12 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(condition_id, 789)
 
         _, params = db.execute.call_args.args
+        statement = str(db.execute.call_args.args[0])
+        self.assertIn("INSERT INTO road_conditions", statement)
+        self.assertNotIn("UPDATE road_conditions", statement)
+        self.assertIn("CAST(:status AS VARCHAR(50))", statement)
+        self.assertIn("CAST(:details AS TEXT)", statement)
+        self.assertIn("CAST(:source_updated_at AS TIMESTAMP WITH TIME ZONE)", statement)
         self.assertEqual(params["road_id"], 7)
         self.assertEqual(params["status"], "chains")
         self.assertEqual(params["severity"], "high")

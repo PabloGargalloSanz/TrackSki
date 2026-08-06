@@ -29,9 +29,20 @@ DATEX2_POINT_PATTERN = re.compile(
     r"nonLinkedPoint\s+(-?\d+(?:[,.]\d+)?)\s+(-?\d+(?:[,.]\d+)?)",
     re.IGNORECASE,
 )
+DATEX2_SEGMENT_PATTERN = re.compile(
+    r"segment\s+(-?\d+(?:[,.]\d+)?)\s+(-?\d+(?:[,.]\d+)?)"
+    r".*?\s+(\d{1,4}(?:[,.]\d{1,3}))\s+"
+    r".*?\s+(-?\d+(?:[,.]\d+)?)\s+(-?\d+(?:[,.]\d+)?)"
+    r".*?\s+(\d{1,4}(?:[,.]\d{1,3}))\b",
+    re.IGNORECASE,
+)
 DIRECTION_PATTERN = re.compile(
     r"\b(?:AP|A|N|M|C|B|GI|L|T|V|CV|CM|CL|EX|GR|H|HU|LE|LO|LU|MA|NA|O|OU|P|PO|"
     r"SA|SE|SG|SO|TE|TO|VA|ZA)-?\d{1,4}[A-Z]?\s+([a-z]+Bound)\b",
+    re.IGNORECASE,
+)
+ANY_DIRECTION_PATTERN = re.compile(
+    r"\b(north|south|east|west|northEast|northWest|southEast|southWest)Bound\b",
     re.IGNORECASE,
 )
 ISO_DATETIME_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
@@ -41,6 +52,11 @@ TECHNICAL_DESCRIPTION_TERMS = {
     "nonlinkedpoint",
     "positive",
     "negative",
+    "poorenvironment",
+    "roadmaintenance",
+    "segment",
+    "slipperyroad",
+    "unspecifiedcarriageway",
     "vehicleobstruction",
     "vehiclestuck",
 }
@@ -49,6 +65,7 @@ INCIDENT_TITLES = {
     "chains_required": "Cadenas obligatorias",
     "snow": "Nieve en la calzada",
     "ice": "Hielo en la calzada",
+    "hail": "Granizo en la calzada",
     "roadworks": "Obras",
     "accident": "Accidente",
     "restriction": "Restriccion",
@@ -136,15 +153,27 @@ def extract_datex2_point(text: str | None) -> tuple[Decimal | None, Decimal | No
         return None, None
 
     match = DATEX2_POINT_PATTERN.search(text)
-    if not match:
-        return None, None
+    if match:
+        return _to_decimal(match.group(1)), _to_decimal(match.group(2))
 
-    return _to_decimal(match.group(1)), _to_decimal(match.group(2))
+    segment_match = DATEX2_SEGMENT_PATTERN.search(text)
+    if segment_match:
+        return _to_decimal(segment_match.group(1)), _to_decimal(segment_match.group(2))
+
+    return None, None
 
 
 def extract_datex2_km(text: str | None) -> tuple[Decimal | None, Decimal | None]:
     if not text:
         return None, None
+
+    segment_match = DATEX2_SEGMENT_PATTERN.search(text)
+    if segment_match:
+        start_km = _to_decimal(segment_match.group(3))
+        end_km = _to_decimal(segment_match.group(6))
+        if start_km > end_km:
+            return end_km, start_km
+        return start_km, end_km
 
     _, longitude = extract_datex2_point(text)
     if longitude is None:
@@ -164,10 +193,17 @@ def extract_direction(text: str | None) -> str | None:
         return None
 
     match = DIRECTION_PATTERN.search(text)
-    if not match:
-        return None
+    if match:
+        return match.group(1)
 
-    return match.group(1)
+    any_match = ANY_DIRECTION_PATTERN.search(text)
+    if any_match:
+        return any_match.group(0)
+
+    if re.search(r"\bboth\b", text, re.IGNORECASE):
+        return "both"
+
+    return None
 
 
 def normalize_incident_type(
@@ -176,7 +212,10 @@ def normalize_incident_type(
 ) -> str:
     text = normalize_text(f"{raw_type or ''} {description or ''}")
 
-    if any(term in text for term in ("carretera cortada", "corte total", "cerrado")):
+    if any(
+        term in text
+        for term in ("carretera cortada", "corte total", "cerrado", "roadclosed")
+    ):
         return "road_closed"
     if "cadena" in text:
         return "chains_required"
@@ -184,10 +223,12 @@ def normalize_incident_type(
         return "snow"
     if "hielo" in text or "helada" in text:
         return "ice"
-    if "obra" in text or "roadworks" in text:
-        return "roadworks"
+    if "granizo" in text or "hail" in text:
+        return "hail"
     if "accidente" in text or "accident" in text:
         return "accident"
+    if any(term in text for term in ("obra", "roadworks", "roadmaintenance")):
+        return "roadworks"
     if "restric" in text or "limitacion" in text:
         return "restriction"
     if "retencion" in text or "congestion" in text:
@@ -197,12 +238,17 @@ def normalize_incident_type(
         for term in (
             "obstaculo",
             "desprendimiento",
+            "environmentalobstruction",
             "obstruction",
             "objectontheroad",
+            "vehiclestuck",
         )
     ):
         return "obstruction"
-    if any(term in text for term in ("meteorolog", "viento", "lluvia")):
+    if any(
+        term in text
+        for term in ("meteorolog", "viento", "lluvia", "poorenvironment")
+    ):
         return "weather"
     if text.strip():
         return "other"
@@ -230,7 +276,7 @@ def normalize_severity(
 ) -> str:
     text = normalize_text(f"{raw_severity or ''} {description or ''}")
 
-    if any(term in text for term in ("critical", "critico", "muy grave")):
+    if any(term in text for term in ("critical", "critico", "muy grave", "highest")):
         return "critical"
     if any(term in text for term in ("high", "alto", "grave")):
         return "high"
@@ -241,8 +287,12 @@ def normalize_severity(
 
     if incident_type == "road_closed":
         return "critical"
-    if incident_type in {"chains_required", "ice"}:
+    if incident_type in {"chains_required", "ice", "hail"}:
         return "high"
+    if any(term in text for term in ("slipperyroad", "poorroadconditions")):
+        return "high"
+    if any(term in text for term in ("laneclosures", "narrowlanes")):
+        return "medium"
     if incident_type in {"snow", "roadworks", "restriction", "accident"}:
         return "medium"
     if incident_type in {"congestion", "obstruction", "weather"}:
@@ -292,7 +342,7 @@ def build_fallback_description(
             parts.append(f"km {start_km}")
         else:
             parts.append(f"km {start_km}-{end_km}")
-    if direction:
+    if direction and direction != "unknown":
         parts.append(f"sentido {direction}")
 
     return ", ".join(parts)
@@ -319,7 +369,7 @@ def parse_datex2_incidents(xml_content: str | bytes) -> list[NormalizedRoadIncid
         severity = normalize_severity(
             _find_first_text(record, {"severity", "trafficConstrictionType"}),
             incident_type,
-            description,
+            f"{description or ''} {search_text}",
         )
         road_code = extract_road_code(f"{description or ''} {search_text}")
         start_km, end_km = extract_km_range(f"{description or ''} {search_text}")
