@@ -485,17 +485,68 @@ Variables necesarias:
 AEMET_API_KEY=
 DGT_DATEX2_URL=
 DGT_DATEX2_TIMEOUT_SECONDS=
+DATA_JOBS_TICK_SECONDS=
+DATA_JOBS_WEATHER_INTERVAL_SECONDS=
+DATA_JOBS_ALERTS_INTERVAL_SECONDS=
+DATA_JOBS_ROADS_INTERVAL_SECONDS=
 ```
+
+## 11. Jobs automaticos
+
+El despliegue con `docker-compose.yml` incluye un servicio `data_jobs` que usa
+la misma imagen del backend y ejecuta ingestas periodicas. No expone puertos,
+no tiene labels de Traefik y solo esta conectado a la red interna.
+
+Intervalos por defecto:
+
+```env
+DATA_JOBS_TICK_SECONDS=60
+DATA_JOBS_WEATHER_INTERVAL_SECONDS=1800
+DATA_JOBS_ALERTS_INTERVAL_SECONDS=1800
+DATA_JOBS_ROADS_INTERVAL_SECONDS=900
+```
+
+Equivalencia:
+
+```text
+Open-Meteo cada 30 min
+AEMET cada 30 min
+DGT DATEX2 cada 15 min
+```
+
+Ver logs:
+
+```bash
+docker compose --env-file .env -p trackski_staging logs --tail=100 data_jobs
+```
+
+Reiniciar solo los jobs:
+
+```bash
+docker compose --env-file .env -p trackski_staging restart data_jobs
+```
+
+Parar solo los jobs:
+
+```bash
+docker compose --env-file .env -p trackski_staging stop data_jobs
+```
+
+El scheduler ejecuta una primera pasada al arrancar y despues respeta los
+intervalos configurados. Lanza los jobs vencidos como tareas asincronas y evita
+que el mismo job se solape consigo mismo si una ejecucion tarda mas que su
+intervalo. Si una fuente falla, se registra el error en logs y el servicio sigue
+vivo para el siguiente intento.
 
 Limitaciones actuales:
 
-- No hay cron, systemd timer, Celery ni APScheduler.
+- No hay Celery, Redis ni cola de trabajos.
 - AEMET resuelve areas desde regiones conocidas de estaciones.
 - Mas adelante habra que mejorar esa relacion estacion-area AEMET con datos
   reales y no solo por region.
 - DGT solo guarda incidencias de carreteras configuradas en `roads`.
 
-## 11. Arquitectura de despliegue
+## 12. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -523,7 +574,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 12. Traefik temporal
+## 13. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -555,7 +606,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 13. Staging y main
+## 14. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -593,7 +644,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 14. Despliegue automatico
+## 15. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -619,7 +670,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 15. Comprobaciones
+## 16. Comprobaciones
 
 Estado:
 
@@ -633,6 +684,7 @@ Logs:
 docker compose --env-file .env -p trackski_staging logs --tail=100
 docker compose --env-file .env -p trackski_staging logs --tail=100 backend
 docker compose --env-file .env -p trackski_staging logs --tail=100 frontend
+docker compose --env-file .env -p trackski_staging logs --tail=100 data_jobs
 ```
 
 Comunicación frontend-backend:
@@ -657,7 +709,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 16. Problemas habituales
+## 17. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -690,7 +742,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 17. Migracion futura a 80/443
+## 18. Migracion futura a 80/443
 
 No realizarla todavia.
 

@@ -50,6 +50,31 @@ services:
 
       - "traefik.http.services.${APP_ENV}-backend.loadbalancer.server.port=${API_PORT}"
 
+  data_jobs:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.jobs.scheduler"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DATABASE_URL: ${DATABASE_URL}
+      AEMET_API_KEY: ${AEMET_API_KEY:-}
+      DGT_DATEX2_URL: ${DGT_DATEX2_URL}
+      DGT_DATEX2_TIMEOUT_SECONDS: ${DGT_DATEX2_TIMEOUT_SECONDS}
+      DATA_JOBS_TICK_SECONDS: ${DATA_JOBS_TICK_SECONDS:-60}
+      DATA_JOBS_WEATHER_INTERVAL_SECONDS: ${DATA_JOBS_WEATHER_INTERVAL_SECONDS:-1800}
+      DATA_JOBS_ALERTS_INTERVAL_SECONDS: ${DATA_JOBS_ALERTS_INTERVAL_SECONDS:-1800}
+      DATA_JOBS_ROADS_INTERVAL_SECONDS: ${DATA_JOBS_ROADS_INTERVAL_SECONDS:-900}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+
   frontend:
     build:
       context: ./frontend
