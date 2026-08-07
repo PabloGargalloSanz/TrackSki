@@ -251,15 +251,52 @@ h1 {
   font-weight: 700;
 }
 
-.roads-section {
+.roads-section,
+.incidents-section {
   margin-top: 16px;
 }
 
-.alerts-section {
+.access-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
   margin-top: 16px;
 }
 
-.alert-list,
+.subsection {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e3e9ee;
+}
+
+.subsection-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subsection-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.subsection-heading span,
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid #c8d3dc;
+  border-radius: 4px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compact-list,
 .incident-list,
 .alternative-list {
   display: grid;
@@ -269,7 +306,7 @@ h1 {
   display: grid;
 }
 
-.alert-row,
+.compact-row,
 .road-row,
 .incident-row,
 .alternative-row {
@@ -281,7 +318,7 @@ h1 {
   border-bottom: 1px solid #e3e9ee;
 }
 
-.alert-row:last-child,
+.compact-row:last-child,
 .road-row:last-child,
 .incident-row:last-child,
 .alternative-row:last-child {
@@ -289,7 +326,7 @@ h1 {
   border-bottom: 0;
 }
 
-.alert-row h3,
+.compact-row h4,
 .road-row h3,
 .incident-list h3,
 .alternative-list h3,
@@ -298,14 +335,13 @@ h1 {
   margin: 0;
 }
 
-.alert-row h3,
+.compact-row h4,
 .road-row h3,
 .incident-list h3,
 .alternative-list h3 {
   font-size: 17px;
 }
 
-.incident-list,
 .alternative-list {
   margin-top: 18px;
   padding-top: 18px;
@@ -317,7 +353,7 @@ h1 {
   font-size: 15px;
 }
 
-.alert-row p,
+.compact-row p,
 .road-row p,
 .incident-row p,
 .alternative-row p,
@@ -341,6 +377,45 @@ h1 {
   color: var(--muted);
   font-size: 12px;
   text-align: right;
+}
+
+.incident-group-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.incident-group {
+  border: 1px solid #e3e9ee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.incident-group summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.incident-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.incident-group[open] summary {
+  border-bottom: 1px solid #e3e9ee;
+}
+
+.incident-group .incident-list {
+  padding: 0 12px 12px;
+}
+
+.incident-group .incident-row {
+  padding: 14px 0;
 }
 
 .inline-heading {
@@ -420,11 +495,15 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .access-grid {
+    grid-template-columns: 1fr;
+  }
+
   .trail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .alert-row,
+  .compact-row,
   .road-row,
   .incident-row,
   .alternative-row {
