@@ -485,62 +485,78 @@ Variables necesarias:
 AEMET_API_KEY=
 DGT_DATEX2_URL=
 DGT_DATEX2_TIMEOUT_SECONDS=
-DATA_JOBS_TICK_SECONDS=
-DATA_JOBS_WEATHER_INTERVAL_SECONDS=
-DATA_JOBS_ALERTS_INTERVAL_SECONDS=
-DATA_JOBS_ROADS_INTERVAL_SECONDS=
 ```
 
 ## 11. Jobs automaticos
 
-El despliegue con `docker-compose.yml` incluye un servicio `data_jobs` que usa
-la misma imagen del backend y ejecuta ingestas periodicas. No expone puertos,
-no tiene labels de Traefik y solo esta conectado a la red interna.
+El despliegue con `docker-compose.yml` incluye servicios one-shot para lanzar
+ingestas desde cron o systemd timer. No hay un proceso Python permanente mirando
+la hora, no se usan hilos y los jobs no forman parte del proceso del backend.
 
-Intervalos por defecto:
-
-```env
-DATA_JOBS_TICK_SECONDS=60
-DATA_JOBS_WEATHER_INTERVAL_SECONDS=1800
-DATA_JOBS_ALERTS_INTERVAL_SECONDS=1800
-DATA_JOBS_ROADS_INTERVAL_SECONDS=900
-```
-
-Equivalencia:
+Servicios disponibles:
 
 ```text
-Open-Meteo cada 30 min
-AEMET cada 30 min
-DGT DATEX2 cada 15 min
+data_job_roads
+data_job_weather
+data_job_alerts
 ```
 
-Ver logs:
+Ejecutar manualmente:
 
 ```bash
-docker compose --env-file .env -p trackski_staging logs --tail=100 data_jobs
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 ```
 
-Reiniciar solo los jobs:
+Los servicios estan bajo el profile `jobs`, por lo que no arrancan con el
+`up -d` normal de la aplicacion. Solo se ejecutan cuando el despliegue,
+cron o systemd llaman a `docker compose --profile jobs run --rm`.
+
+Orden recomendado:
+
+```text
+1. DGT DATEX2 nada mas desplegar o al arrancar el servidor.
+2. Open-Meteo nada mas desplegar o al arrancar el servidor.
+3. AEMET nada mas desplegar o al arrancar el servidor.
+4. DGT DATEX2 cada 15 min.
+5. Open-Meteo cada 30 min.
+6. AEMET cada 30 min.
+```
+
+Ejemplo de cron en staging:
 
 ```bash
-docker compose --env-file .env -p trackski_staging restart data_jobs
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+@reboot cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+*/15 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
+*/30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
+*/30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 ```
 
-Parar solo los jobs:
+Probar una ejecucion y ver el resultado en consola:
 
 ```bash
-docker compose --env-file .env -p trackski_staging stop data_jobs
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
 ```
 
-El scheduler ejecuta una primera pasada al arrancar y despues respeta los
-intervalos configurados. Lanza los jobs vencidos como tareas asincronas y evita
-que el mismo job se solape consigo mismo si una ejecucion tarda mas que su
-intervalo. Si una fuente falla, se registra el error en logs y el servicio sigue
-vivo para el siguiente intento.
+Ver historico de ejecuciones si se redirige salida desde cron:
+
+```bash
+*/15 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads >> /var/log/trackski_jobs.log 2>&1
+```
+
+Cada ejecucion es un proceso independiente. Si una fuente falla, el comando
+termina con error y cron volvera a intentarlo en la siguiente ejecucion. La app
+web sigue levantada en `backend` y `frontend`.
 
 Limitaciones actuales:
 
 - No hay Celery, Redis ni cola de trabajos.
+- Si un job tarda mas que su intervalo, cron podria lanzar otra ejecucion. En
+  ese caso conviene envolver los comandos con `flock` en el servidor.
 - AEMET resuelve areas desde regiones conocidas de estaciones.
 - Mas adelante habra que mejorar esa relacion estacion-area AEMET con datos
   reales y no solo por region.
@@ -684,7 +700,6 @@ Logs:
 docker compose --env-file .env -p trackski_staging logs --tail=100
 docker compose --env-file .env -p trackski_staging logs --tail=100 backend
 docker compose --env-file .env -p trackski_staging logs --tail=100 frontend
-docker compose --env-file .env -p trackski_staging logs --tail=100 data_jobs
 ```
 
 Comunicación frontend-backend:
