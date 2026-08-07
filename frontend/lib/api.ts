@@ -57,6 +57,11 @@ export type LineString = {
   coordinates: [number, number][];
 };
 
+export type Point = {
+  type: "Point";
+  coordinates: [number, number];
+};
+
 export type Road = {
   id: number;
   code: string;
@@ -72,11 +77,77 @@ export type Road = {
   is_verified: boolean;
 };
 
+export type ResortAccessRoad = {
+  id: number;
+  road: Road;
+  access_role: string;
+  segment_description: string | null;
+  from_km: number | null;
+  to_km: number | null;
+  priority: number;
+};
+
+export type RoadIncident = {
+  id: number;
+  road_id: number | null;
+  road_code: string | null;
+  title: string | null;
+  description: string | null;
+  incident_type: string;
+  status: string;
+  severity: string;
+  start_km: number | null;
+  end_km: number | null;
+  direction: string | null;
+  location: Point | null;
+  affected_route: LineString | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  reported_at: string | null;
+  updated_at: string;
+  source: string;
+  access_role: string | null;
+};
+
+export type RoadAlternative = {
+  id: number;
+  affected_road_id: number | null;
+  alternative_road_id: number | null;
+  title: string;
+  description: string;
+  priority: number;
+};
+
+export type ResortAccessStatus = {
+  resort_id: number;
+  overall_status: string;
+  roads: ResortAccessRoad[];
+  incidents: RoadIncident[];
+  alternatives: RoadAlternative[];
+};
+
+export type WeatherAlert = {
+  id: number;
+  identifier: string;
+  level: string;
+  event: string;
+  area: string;
+  onset: string | null;
+  expires: string | null;
+  headline: string | null;
+  description: string | null;
+  instruction: string | null;
+  data_source: string;
+  created_at: string;
+};
+
 export type ResortSummary = {
   resort: Resort;
   latest_snow_report: SnowReport | null;
   latest_weather_report: WeatherReport | null;
   roads: Road[];
+  weather_alerts: WeatherAlert[];
+  access_status: ResortAccessStatus;
 };
 
 const internalApiUrl =

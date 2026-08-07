@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getResortSummary } from "../../../lib/api";
+import { getResortSummary, type RoadIncident } from "../../../lib/api";
 
 export const dynamic = "force-dynamic";
 
 type ResortDetailPageProps = {
   params: Promise<{ id: string }>;
+};
+
+const severityOrder = ["critical", "high", "medium", "low", "unknown"];
+
+const severityLabels: Record<string, string> = {
+  critical: "Criticas",
+  high: "Altas",
+  medium: "Medias",
+  low: "Leves",
+  unknown: "Sin clasificar",
 };
 
 function formatDate(value: string): string {
@@ -19,6 +29,28 @@ function formatDate(value: string): string {
 
 function valueOrDash(value: number | string | null, suffix = ""): string {
   return value === null ? "-" : `${value}${suffix}`;
+}
+
+function kmRange(incident: RoadIncident): string {
+  if (incident.start_km === null && incident.end_km === null) {
+    return "Tramo sin km informado";
+  }
+
+  if (incident.start_km === incident.end_km || incident.end_km === null) {
+    return `km ${incident.start_km}`;
+  }
+
+  return `km ${incident.start_km} - ${incident.end_km}`;
+}
+
+function groupIncidentsBySeverity(incidents: RoadIncident[]) {
+  return severityOrder
+    .map((severity) => ({
+      severity,
+      label: severityLabels[severity],
+      incidents: incidents.filter((incident) => incident.severity === severity),
+    }))
+    .filter((group) => group.incidents.length > 0);
 }
 
 export default async function ResortDetailPage({
@@ -55,8 +87,14 @@ export default async function ResortDetailPage({
     notFound();
   }
 
-  const { resort, latest_snow_report: snow, latest_weather_report: weather } =
-    summary;
+  const {
+    resort,
+    latest_snow_report: snow,
+    latest_weather_report: weather,
+    weather_alerts: alerts,
+    access_status: accessStatus,
+  } = summary;
+  const incidentGroups = groupIncidentsBySeverity(accessStatus.incidents);
 
   return (
     <main className="page">
@@ -152,32 +190,71 @@ export default async function ResortDetailPage({
             {weather && <time>{formatDate(weather.reported_at)}</time>}
           </div>
           {weather ? (
-            <dl className="metric-grid">
-              <div>
-                <dt>Estado</dt>
-                <dd>{weather.weather ?? "-"}</dd>
+            <>
+              <dl className="metric-grid">
+                <div>
+                  <dt>Estado</dt>
+                  <dd>{weather.weather ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>Temperatura</dt>
+                  <dd>{valueOrDash(weather.temperature_celsius, " C")}</dd>
+                </div>
+                <div>
+                  <dt>Viento</dt>
+                  <dd>{valueOrDash(weather.wind_speed_kmh, " km/h")}</dd>
+                </div>
+                <div>
+                  <dt>Direccion</dt>
+                  <dd>{weather.wind_direction ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>Precipitacion</dt>
+                  <dd>{valueOrDash(weather.precipitation_mm, " mm")}</dd>
+                </div>
+                <div>
+                  <dt>Visibilidad</dt>
+                  <dd>{valueOrDash(weather.visibility_m, " m")}</dd>
+                </div>
+              </dl>
+
+              <div className="subsection">
+                <div className="subsection-heading">
+                  <h3>Avisos meteorologicos</h3>
+                  <span>{alerts.length}</span>
+                </div>
+                {alerts.length > 0 ? (
+                  <div className="compact-list">
+                    {alerts.map((alert) => (
+                      <article className="compact-row" key={alert.id}>
+                        <div>
+                          <div className="inline-heading">
+                            <span
+                              className={`severity-pill severity-pill--${alert.level}`}
+                            >
+                              {alert.level}
+                            </span>
+                            <h4>{alert.event}</h4>
+                          </div>
+                          <p>{alert.headline ?? alert.description ?? alert.area}</p>
+                          <p className="meta-line">{alert.area}</p>
+                        </div>
+                        <div className="alert-validity">
+                          {alert.onset && <time>Desde {formatDate(alert.onset)}</time>}
+                          {alert.expires && (
+                            <time>Hasta {formatDate(alert.expires)}</time>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-message">
+                    Sin avisos meteorologicos activos.
+                  </p>
+                )}
               </div>
-              <div>
-                <dt>Temperatura</dt>
-                <dd>{valueOrDash(weather.temperature_celsius, " °C")}</dd>
-              </div>
-              <div>
-                <dt>Viento</dt>
-                <dd>{valueOrDash(weather.wind_speed_kmh, " km/h")}</dd>
-              </div>
-              <div>
-                <dt>Direccion</dt>
-                <dd>{weather.wind_direction ?? "-"}</dd>
-              </div>
-              <div>
-                <dt>Precipitacion</dt>
-                <dd>{valueOrDash(weather.precipitation_mm, " mm")}</dd>
-              </div>
-              <div>
-                <dt>Visibilidad</dt>
-                <dd>{valueOrDash(weather.visibility_m, " m")}</dd>
-              </div>
-            </dl>
+            </>
           ) : (
             <p className="empty-message">
               No hay datos meteorologicos disponibles.
@@ -186,33 +263,118 @@ export default async function ResortDetailPage({
         </section>
       </div>
 
-      <section className="detail-section roads-section">
-        <div className="section-heading">
-          <h2>Accesos por carretera</h2>
-        </div>
-        {summary.roads.length > 0 ? (
-          <div className="road-list">
-            {summary.roads.map((road) => (
-              <article className="road-row" key={road.id}>
-                <div>
-                  <h3>{road.name ?? road.code}</h3>
-                  <p>{road.latest_condition?.details ?? "Sin observaciones"}</p>
-                </div>
-                <div className="road-status">
-                  <strong>{road.latest_condition?.status ?? "Sin datos"}</strong>
-                  {road.latest_condition && (
-                    <time>{formatDate(road.latest_condition.reported_at)}</time>
-                  )}
-                </div>
-              </article>
-            ))}
+      <div className="access-grid">
+        <section className="detail-section roads-section">
+          <div className="section-heading">
+            <h2>Accesos por carretera</h2>
+            <strong
+              className={`status-chip status-chip--${accessStatus.overall_status}`}
+            >
+              {accessStatus.overall_status}
+            </strong>
           </div>
-        ) : (
-          <p className="empty-message">
-            No hay carreteras asociadas a esta estacion.
-          </p>
-        )}
-      </section>
+          {accessStatus.roads.length > 0 ? (
+            <div className="road-list">
+              {accessStatus.roads.map((accessRoad) => (
+                <article className="road-row" key={accessRoad.id}>
+                  <div>
+                    <h3>{accessRoad.road.name ?? accessRoad.road.code}</h3>
+                    <p>
+                      {accessRoad.segment_description ??
+                        accessRoad.road.latest_condition?.details ??
+                        "Sin observaciones"}
+                    </p>
+                    <p className="meta-line">
+                      {accessRoad.access_role}
+                      {accessRoad.from_km !== null || accessRoad.to_km !== null
+                        ? ` - ${valueOrDash(accessRoad.from_km)}-${valueOrDash(
+                            accessRoad.to_km,
+                          )} km`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="road-status">
+                    <strong>
+                      {accessRoad.road.latest_condition?.status ?? "Sin datos"}
+                    </strong>
+                    {accessRoad.road.latest_condition && (
+                      <time>
+                        {formatDate(accessRoad.road.latest_condition.reported_at)}
+                      </time>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-message">
+              No hay carreteras asociadas a esta estacion.
+            </p>
+          )}
+
+          {accessStatus.alternatives.length > 0 && (
+            <div className="alternative-list">
+              <h3>Alternativas</h3>
+              {accessStatus.alternatives.map((alternative) => (
+                <article className="alternative-row" key={alternative.id}>
+                  <h4>{alternative.title}</h4>
+                  <p>{alternative.description}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="detail-section incidents-section">
+          <div className="section-heading">
+            <h2>Incidencias de carretera</h2>
+            <span className="count-badge">{accessStatus.incidents.length}</span>
+          </div>
+
+          {incidentGroups.length > 0 ? (
+            <div className="incident-group-list">
+              {incidentGroups.map((group) => (
+                <details
+                  className="incident-group"
+                  key={group.severity}
+                  open={group.severity === "critical" || group.severity === "high"}
+                >
+                  <summary>
+                    <span
+                      className={`severity-pill severity-pill--${group.severity}`}
+                    >
+                      {group.severity}
+                    </span>
+                    <strong>{group.label}</strong>
+                    <span>{group.incidents.length}</span>
+                  </summary>
+                  <div className="incident-list">
+                    {group.incidents.map((incident) => (
+                      <article className="incident-row" key={incident.id}>
+                        <div>
+                          <h4>{incident.title ?? incident.incident_type}</h4>
+                          <p>{incident.description ?? "Sin descripcion disponible"}</p>
+                          <p className="meta-line">
+                            {incident.road_code ?? "Carretera sin codigo"} -{" "}
+                            {kmRange(incident)}
+                            {incident.access_role ? ` - ${incident.access_role}` : ""}
+                          </p>
+                        </div>
+                        <div className="road-status">
+                          <strong>{incident.status}</strong>
+                          <time>{formatDate(incident.updated_at)}</time>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-message">Sin incidencias activas conocidas.</p>
+          )}
+        </section>
+      </div>
     </main>
   );
 }

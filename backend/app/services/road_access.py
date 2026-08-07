@@ -105,6 +105,7 @@ def _road_condition_status_from_incident(incident: dict) -> str:
     if incident_type in {
         "snow",
         "ice",
+        "hail",
         "weather",
         "restriction",
         "roadworks",

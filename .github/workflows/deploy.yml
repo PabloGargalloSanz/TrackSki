@@ -53,5 +53,8 @@ jobs:
             docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
 
             docker compose --env-file .env -p "$PROJECT_NAME" up -d --build
+            docker compose --env-file .env -p "$PROJECT_NAME" --profile jobs run --rm data_job_roads || echo "WARNING: road data refresh failed"
+            docker compose --env-file .env -p "$PROJECT_NAME" --profile jobs run --rm data_job_weather || echo "WARNING: weather data refresh failed"
+            docker compose --env-file .env -p "$PROJECT_NAME" --profile jobs run --rm data_job_alerts || echo "WARNING: alert data refresh failed"
 
             docker image prune -f

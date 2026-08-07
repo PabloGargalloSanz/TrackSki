@@ -213,6 +213,7 @@ GET /resorts/{id}/access-status
 GET /roads
 GET /roads/incidents/active
 GET /roads/{id}/conditions/latest
+GET /weather/alerts/active
 ```
 
 Los historicos de nieve y meteorologia aceptan `limit`, entre 1 y 100:
@@ -227,6 +228,10 @@ El frontend utiliza:
 GET /resorts
 GET /resorts/{id}/summary
 ```
+
+`GET /resorts/{id}/summary` es la fuente principal de la ficha de estacion e
+incluye nieve, meteorologia, avisos AEMET aplicables, carreteras y estado
+completo de accesos.
 
 ## 7. Carreteras y accesos
 
@@ -296,6 +301,9 @@ GET /roads/incidents/active
 GET /roads/incidents/active?road_code=A-23
 GET /roads/incidents/active?severity=high
 GET /resorts/{id}/access-status
+GET /weather/alerts/active
+GET /weather/alerts/active?level=naranja
+GET /weather/alerts/active?area=Pirineo
 ```
 
 DGT DATEX2 no cubre Cataluna ni Pais Vasco. Esas fuentes quedan para una fase
@@ -357,11 +365,18 @@ por nieve, viento, lluvia o temperaturas. Requiere configurar:
 AEMET_API_KEY=
 ```
 
-Actualmente se puede ingerir avisos por area:
+Actualmente se puede ingerir avisos por areas concretas:
 
 ```bash
 cd backend
 python -m app.commands.ingest_alerts --area 62
+```
+
+Tambien se puede omitir `--area` para que el comando derive las areas AEMET
+unicas a partir de las estaciones configuradas:
+
+```bash
+python -m app.commands.ingest_alerts
 ```
 
 Areas utiles como referencia:
@@ -385,7 +400,169 @@ Ambas fuentes deben conservarse por separado.
 La ingesta automatica de AEMET tambien queda pendiente para una fase posterior,
 junto con el resto de jobs.
 
-## 10. Arquitectura de despliegue
+## 10. Jobs manuales de datos reales
+
+TrackSki tiene un job agrupador para refrescar datos reales sin automatizarlos
+todavia:
+
+```bash
+cd backend
+python -m app.jobs.refresh_real_data --all
+```
+
+Tambien se puede ejecutar por partes:
+
+```bash
+python -m app.jobs.refresh_real_data --weather
+python -m app.jobs.refresh_real_data --alerts
+python -m app.jobs.refresh_real_data --alerts --area 62 --area 61
+python -m app.jobs.refresh_real_data --roads
+```
+
+Si no se pasa `--area` al ejecutar alertas, el job calcula las areas AEMET
+unicas desde las estaciones configuradas y hace una peticion por area, no por
+estacion:
+
+```bash
+python -m app.jobs.refresh_real_data --alerts
+python -m app.jobs.refresh_real_data --all
+```
+
+Si no se pasa ningun flag, el job no ejecuta nada y muestra un error claro. Se
+hace asi para evitar refrescos completos por accidente.
+
+Importante: ejecutar varias lineas seguidas en PowerShell lanza varios jobs uno
+detras de otro. Para una prueba normal, ejecutar solo un comando cada vez:
+
+```bash
+python -m app.jobs.refresh_real_data --weather
+```
+
+El agrupador no duplica la logica de ingesta: reutiliza los comandos y jobs ya
+existentes:
+
+- Open-Meteo: `app.commands.ingest_weather`
+- AEMET: `app.commands.ingest_alerts`
+- DGT DATEX2: `app.jobs.import_dgt_datex2_incidents`
+
+Cada fuente devuelve un resumen:
+
+- `processed`: datos leidos desde la fuente.
+- `inserted`: registros insertados solo cuando se puede saber con seguridad.
+- `updated`: resumenes actualizados, por ejemplo `road_conditions`.
+- `saved`: registros guardados mediante upsert; pueden ser nuevos o existentes.
+- `skipped`: datos omitidos por no ser relevantes o estar repetidos.
+- `status`: `success`, `partial` o `failed`.
+
+Si una fuente falla, el agrupador marca esa fuente como `failed` y continua con
+las demas siempre que sea posible.
+
+Comandos existentes que siguen funcionando:
+
+```bash
+python -m app.commands.ingest_weather
+python -m app.commands.ingest_weather --resort-id 1
+python -m app.commands.ingest_alerts --area 62
+python -m app.jobs.import_dgt_datex2_incidents
+```
+
+Comportamiento por fuente:
+
+- Open-Meteo hace una peticion por estacion porque necesita coordenadas.
+- AEMET hace una peticion por area AEMET unica, no por estacion.
+- DGT hace una peticion global al XML DATEX2 y filtra localmente por carreteras
+  configuradas en `roads`.
+
+Datos actualizados:
+
+- `weather_reports` con Open-Meteo.
+- `weather_alerts` con AEMET.
+- `road_incidents` y `road_conditions` con DGT DATEX2.
+
+Variables necesarias:
+
+```env
+AEMET_API_KEY=
+DGT_DATEX2_URL=
+DGT_DATEX2_TIMEOUT_SECONDS=
+```
+
+## 11. Jobs automaticos
+
+El despliegue con `docker-compose.yml` incluye servicios one-shot para lanzar
+ingestas desde cron o systemd timer. No hay un proceso Python permanente mirando
+la hora, no se usan hilos y los jobs no forman parte del proceso del backend.
+
+Servicios disponibles:
+
+```text
+data_job_roads
+data_job_weather
+data_job_alerts
+```
+
+Ejecutar manualmente:
+
+```bash
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+```
+
+Los servicios estan bajo el profile `jobs`, por lo que no arrancan con el
+`up -d` normal de la aplicacion. Solo se ejecutan cuando el despliegue,
+cron o systemd llaman a `docker compose --profile jobs run --rm`.
+
+Orden recomendado:
+
+```text
+1. DGT DATEX2 nada mas desplegar o al arrancar el servidor.
+2. Open-Meteo nada mas desplegar o al arrancar el servidor.
+3. AEMET nada mas desplegar o al arrancar el servidor.
+4. DGT DATEX2 cada 15 min.
+5. Open-Meteo cada 30 min.
+6. AEMET cada 30 min.
+```
+
+Ejemplo de cron en staging:
+
+```bash
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+@reboot cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+*/15 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
+*/30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
+*/30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+```
+
+Probar una ejecucion y ver el resultado en consola:
+
+```bash
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
+```
+
+Ver historico de ejecuciones si se redirige salida desde cron:
+
+```bash
+*/15 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads >> /var/log/trackski_jobs.log 2>&1
+```
+
+Cada ejecucion es un proceso independiente. Si una fuente falla, el comando
+termina con error y cron volvera a intentarlo en la siguiente ejecucion. La app
+web sigue levantada en `backend` y `frontend`.
+
+Limitaciones actuales:
+
+- No hay Celery, Redis ni cola de trabajos.
+- Si un job tarda mas que su intervalo, cron podria lanzar otra ejecucion. En
+  ese caso conviene envolver los comandos con `flock` en el servidor.
+- AEMET resuelve areas desde regiones conocidas de estaciones.
+- Mas adelante habra que mejorar esa relacion estacion-area AEMET con datos
+  reales y no solo por region.
+- DGT solo guarda incidencias de carreteras configuradas en `roads`.
+
+## 12. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -413,7 +590,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 11. Traefik temporal
+## 13. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -445,7 +622,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 12. Staging y main
+## 14. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -483,7 +660,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 13. Despliegue automatico
+## 15. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -509,7 +686,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 14. Comprobaciones
+## 16. Comprobaciones
 
 Estado:
 
@@ -547,7 +724,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 15. Problemas habituales
+## 17. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -580,7 +757,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 16. Migracion futura a 80/443
+## 18. Migracion futura a 80/443
 
 No realizarla todavia.
 

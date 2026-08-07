@@ -1,5 +1,15 @@
 name: trackski_local
 
+x-job-environment: &job-environment
+  DB_HOST: db
+  DB_PORT: 5432
+  DB_NAME: ${DB_NAME}
+  DB_USER: ${DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD}
+  AEMET_API_KEY: ${AEMET_API_KEY:-}
+  DGT_DATEX2_URL: ${DGT_DATEX2_URL}
+  DGT_DATEX2_TIMEOUT_SECONDS: ${DGT_DATEX2_TIMEOUT_SECONDS}
+
 services:
   db:
     image: postgis/postgis:16-3.4
@@ -18,6 +28,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  data_job_roads:
+    build:
+      context: ./backend
+    profiles: ["jobs"]
+    restart: "no"
+    command: ["python", "-m", "app.jobs.refresh_real_data", "--roads"]
+    environment: *job-environment
+    depends_on:
+      db:
+        condition: service_healthy
+
+  data_job_weather:
+    build:
+      context: ./backend
+    profiles: ["jobs"]
+    restart: "no"
+    command: ["python", "-m", "app.jobs.refresh_real_data", "--weather"]
+    environment: *job-environment
+    depends_on:
+      db:
+        condition: service_healthy
+
+  data_job_alerts:
+    build:
+      context: ./backend
+    profiles: ["jobs"]
+    restart: "no"
+    command: ["python", "-m", "app.jobs.refresh_real_data", "--alerts"]
+    environment: *job-environment
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data_local:

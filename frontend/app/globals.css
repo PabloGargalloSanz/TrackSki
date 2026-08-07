@@ -187,6 +187,7 @@ h1 {
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 16px;
   margin-top: 24px;
 }
@@ -196,6 +197,11 @@ h1 {
   border: 1px solid #d9e2ea;
   border-radius: 8px;
   padding: 20px;
+}
+
+.detail-grid > .detail-section,
+.access-grid > .detail-section {
+  min-height: 330px;
 }
 
 .section-heading {
@@ -251,15 +257,66 @@ h1 {
   font-weight: 700;
 }
 
-.roads-section {
+.roads-section,
+.incidents-section {
   margin-top: 16px;
+}
+
+.access-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.subsection {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e3e9ee;
+}
+
+.subsection-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subsection-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.subsection-heading span,
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid #c8d3dc;
+  border-radius: 4px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compact-list,
+.incident-list,
+.alternative-list {
+  display: grid;
 }
 
 .road-list {
   display: grid;
 }
 
-.road-row {
+.compact-row,
+.road-row,
+.incident-row,
+.alternative-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -268,16 +325,45 @@ h1 {
   border-bottom: 1px solid #e3e9ee;
 }
 
-.road-row:last-child {
+.compact-row:last-child,
+.road-row:last-child,
+.incident-row:last-child,
+.alternative-row:last-child {
   padding-bottom: 0;
   border-bottom: 0;
 }
 
-.road-row h3 {
+.compact-row h4,
+.road-row h3,
+.incident-list h3,
+.alternative-list h3,
+.incident-row h4,
+.alternative-row h4 {
+  margin: 0;
+}
+
+.compact-row h4,
+.road-row h3,
+.incident-list h3,
+.alternative-list h3 {
   font-size: 17px;
 }
 
+.alternative-list {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e3e9ee;
+}
+
+.incident-row h4,
+.alternative-row h4 {
+  font-size: 15px;
+}
+
+.compact-row p,
 .road-row p,
+.incident-row p,
+.alternative-row p,
 .empty-message {
   margin: 6px 0 0;
   color: var(--muted);
@@ -289,6 +375,120 @@ h1 {
   flex: none;
   gap: 5px;
   text-align: right;
+}
+
+.alert-validity {
+  display: grid;
+  flex: none;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.incident-group-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.incident-group {
+  border: 1px solid #e3e9ee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.incident-group summary {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.incident-group summary > span:last-child {
+  text-align: right;
+}
+
+.incident-group summary .severity-pill {
+  justify-content: center;
+  width: 68px;
+}
+
+.incident-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.incident-group[open] summary {
+  border-bottom: 1px solid #e3e9ee;
+}
+
+.incident-group .incident-list {
+  padding: 0 12px 12px;
+}
+
+.incident-group .incident-row {
+  padding: 14px 0;
+}
+
+.inline-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.meta-line {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.severity-pill,
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #c8d3dc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.severity-pill--rojo,
+.severity-pill--critical,
+.status-chip--closed {
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+.severity-pill--naranja,
+.severity-pill--high,
+.status-chip--chains {
+  border-color: #ea580c;
+  color: #9a3412;
+}
+
+.severity-pill--amarillo,
+.severity-pill--medium,
+.status-chip--affected {
+  border-color: #d3a72c;
+  color: #765b0a;
+}
+
+.severity-pill--low,
+.status-chip--caution {
+  border-color: #59a99f;
+  color: var(--accent-strong);
+}
+
+.status-chip--open {
+  border-color: #16a34a;
+  color: #166534;
 }
 
 @media (max-width: 680px) {
@@ -311,16 +511,24 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .access-grid {
+    grid-template-columns: 1fr;
+  }
+
   .trail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .road-row {
+  .compact-row,
+  .road-row,
+  .incident-row,
+  .alternative-row {
     flex-direction: column;
     gap: 12px;
   }
 
-  .road-status {
+  .road-status,
+  .alert-validity {
     text-align: left;
   }
 

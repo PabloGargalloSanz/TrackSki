@@ -1,7 +1,74 @@
 from sqlalchemy import text
+from sqlalchemy import bindparam
 from sqlalchemy.orm import Session
 
 from app.services.weather.alerts import WeatherAlert
+
+
+def get_active_weather_alerts(
+    db: Session,
+    *,
+    area: str | None = None,
+    areas: list[str] | None = None,
+    level: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    filters = [
+        "(onset IS NULL OR onset <= CURRENT_TIMESTAMP)",
+        "(expires IS NULL OR expires >= CURRENT_TIMESTAMP)",
+        "level <> 'verde'",
+    ]
+    params = {"limit": limit}
+    if area:
+        filters.append("area ILIKE :area")
+        params["area"] = f"%{area}%"
+    if areas:
+        filters.append("area IN :areas")
+        params["areas"] = areas
+    if level:
+        filters.append("level = :level")
+        params["level"] = level
+
+    where_clause = " AND ".join(filters)
+    statement = text(
+        f"""
+            SELECT
+                id,
+                identifier,
+                level,
+                event,
+                area,
+                onset,
+                expires,
+                headline,
+                description,
+                instruction,
+                data_source,
+                created_at
+            FROM weather_alerts
+            WHERE {where_clause}
+            ORDER BY
+                CASE level
+                    WHEN 'rojo' THEN 1
+                    WHEN 'naranja' THEN 2
+                    WHEN 'amarillo' THEN 3
+                    WHEN 'verde' THEN 4
+                    ELSE 5
+                END,
+                COALESCE(onset, created_at) DESC,
+                id DESC
+            LIMIT :limit
+            """
+    )
+    if areas:
+        statement = statement.bindparams(bindparam("areas", expanding=True))
+
+    result = db.execute(
+        statement,
+        params,
+    )
+
+    return [dict(row) for row in result.mappings()]
 
 
 def save_weather_alert(db: Session, alert: WeatherAlert) -> int:

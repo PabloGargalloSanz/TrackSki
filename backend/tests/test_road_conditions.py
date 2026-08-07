@@ -5,7 +5,9 @@ import unittest
 
 from app.repositories.roads import (
     create_road_condition,
+    get_active_road_incidents_for_road_ids,
     get_best_road_id_by_code,
+    mark_stale_dgt_incidents_resolved,
     upsert_road_condition_summary,
     upsert_road_incident,
 )
@@ -55,6 +57,48 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         _, params = db.execute.call_args.args
         self.assertEqual(params["road_code"], "A-136")
 
+    def test_get_active_road_incidents_for_access_filters_noise(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.mappings.return_value = []
+        db.execute.return_value = result
+
+        incidents = get_active_road_incidents_for_road_ids(db, [1, 2], limit=30)
+
+        self.assertEqual(incidents, [])
+        statement, params = db.execute.call_args.args
+        sql = str(statement)
+        self.assertIn("updated_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'", sql)
+        self.assertIn("severity = 'unknown'", sql)
+        self.assertIn("incident_type IN ('unknown', 'other')", sql)
+        self.assertIn("LIMIT :limit", sql)
+        self.assertEqual(params["road_ids"], [1, 2])
+        self.assertEqual(params["limit"], 30)
+
+    def test_mark_stale_dgt_incidents_resolved_returns_updated_count(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.fetchall.return_value = [(1,), (2,)]
+        db.execute.return_value = result
+
+        updated = mark_stale_dgt_incidents_resolved(db, ["record-1", "record-2"])
+
+        self.assertEqual(updated, 2)
+        statement, params = db.execute.call_args.args
+        sql = str(statement)
+        self.assertIn("UPDATE road_incidents", sql)
+        self.assertIn("status = 'resolved'", sql)
+        self.assertIn("source_id NOT IN", sql)
+        self.assertEqual(params["current_source_ids"], ["record-1", "record-2"])
+
+    def test_mark_stale_dgt_incidents_resolved_skips_empty_source_ids(self) -> None:
+        db = Mock()
+
+        updated = mark_stale_dgt_incidents_resolved(db, [])
+
+        self.assertEqual(updated, 0)
+        db.execute.assert_not_called()
+
     def test_upsert_road_incident_returns_saved_id(self) -> None:
         db = Mock()
         result = Mock()
@@ -98,7 +142,7 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(params["updated_at"], updated_at)
         self.assertEqual(params["raw_payload"], '{"source_id": "record-1"}')
 
-    def test_upsert_road_condition_summary_returns_saved_id(self) -> None:
+    def test_upsert_road_condition_summary_keeps_history(self) -> None:
         db = Mock()
         result = Mock()
         result.scalar_one.return_value = 789
@@ -119,6 +163,12 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(condition_id, 789)
 
         _, params = db.execute.call_args.args
+        statement = str(db.execute.call_args.args[0])
+        self.assertIn("INSERT INTO road_conditions", statement)
+        self.assertNotIn("UPDATE road_conditions", statement)
+        self.assertIn("CAST(:status AS VARCHAR(50))", statement)
+        self.assertIn("CAST(:details AS TEXT)", statement)
+        self.assertIn("CAST(:source_updated_at AS TIMESTAMP WITH TIME ZONE)", statement)
         self.assertEqual(params["road_id"], 7)
         self.assertEqual(params["status"], "chains")
         self.assertEqual(params["severity"], "high")

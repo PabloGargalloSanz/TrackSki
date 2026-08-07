@@ -50,6 +50,7 @@ class RoadIncident(BaseModel):
     reported_at: datetime | None
     updated_at: datetime
     source: str
+    access_role: str | None = None
 
 
 class ResortAccessRoad(BaseModel):

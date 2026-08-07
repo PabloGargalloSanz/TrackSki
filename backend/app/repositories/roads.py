@@ -234,25 +234,17 @@ def upsert_road_condition_summary(
         text(
             """
             WITH latest AS (
-                SELECT id
+                SELECT
+                    id,
+                    status,
+                    severity,
+                    details,
+                    source_updated_at
                 FROM road_conditions
                 WHERE road_id = :road_id
                   AND data_source = :data_source
                 ORDER BY reported_at DESC, id DESC
                 LIMIT 1
-            ),
-            updated AS (
-                UPDATE road_conditions
-                SET
-                    status = :status,
-                    severity = :severity,
-                    details = :details,
-                    is_verified = FALSE,
-                    source_updated_at = :source_updated_at,
-                    raw_payload = CAST(:raw_payload AS JSONB),
-                    reported_at = CURRENT_TIMESTAMP
-                WHERE id IN (SELECT id FROM latest)
-                RETURNING id
             ),
             inserted AS (
                 INSERT INTO road_conditions (
@@ -267,19 +259,30 @@ def upsert_road_condition_summary(
                 )
                 SELECT
                     :road_id,
-                    :status,
-                    :severity,
-                    :details,
-                    :data_source,
+                    CAST(:status AS VARCHAR(50)),
+                    CAST(:severity AS VARCHAR(50)),
+                    CAST(:details AS TEXT),
+                    CAST(:data_source AS VARCHAR(100)),
                     FALSE,
-                    :source_updated_at,
+                    CAST(:source_updated_at AS TIMESTAMP WITH TIME ZONE),
                     CAST(:raw_payload AS JSONB)
-                WHERE NOT EXISTS (SELECT 1 FROM updated)
+                WHERE NOT EXISTS (SELECT 1 FROM latest)
+                   OR EXISTS (
+                       SELECT 1
+                       FROM latest
+                       WHERE latest.status IS DISTINCT FROM CAST(:status AS VARCHAR(50))
+                          OR latest.severity IS DISTINCT FROM CAST(:severity AS VARCHAR(50))
+                          OR latest.details IS DISTINCT FROM CAST(:details AS TEXT)
+                          OR latest.source_updated_at IS DISTINCT FROM CAST(
+                              :source_updated_at AS TIMESTAMP WITH TIME ZONE
+                          )
+                   )
                 RETURNING id
             )
-            SELECT id FROM updated
-            UNION ALL
             SELECT id FROM inserted
+            UNION ALL
+            SELECT id FROM latest
+            WHERE NOT EXISTS (SELECT 1 FROM inserted)
             LIMIT 1
             """
         ),
@@ -403,6 +406,30 @@ def upsert_road_incident(
     return result.scalar_one()
 
 
+def mark_stale_dgt_incidents_resolved(
+    db: Session,
+    current_source_ids: list[str],
+) -> int:
+    if not current_source_ids:
+        return 0
+
+    statement = text(
+        """
+            UPDATE road_incidents
+            SET
+                status = 'resolved',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE source = 'dgt_datex2_v37'
+              AND status IN ('active', 'planned')
+              AND source_id NOT IN :current_source_ids
+            RETURNING id
+        """
+    ).bindparams(bindparam("current_source_ids", expanding=True))
+
+    result = db.execute(statement, {"current_source_ids": current_source_ids})
+    return len(result.fetchall())
+
+
 def get_active_road_incidents(
     db: Session,
     *,
@@ -515,6 +542,7 @@ def get_access_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
 def get_active_road_incidents_for_road_ids(
     db: Session,
     road_ids: list[int],
+    limit: int = 50,
 ) -> list[dict]:
     if not road_ids:
         return []
@@ -543,6 +571,15 @@ def get_active_road_incidents_for_road_ids(
             FROM road_incidents
             WHERE status IN ('active', 'planned')
               AND road_id IN :road_ids
+              AND updated_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
+              AND NOT (
+                  severity = 'unknown'
+                  AND incident_type IN ('unknown', 'other')
+                  AND title IS NULL
+                  AND description IS NULL
+                  AND start_km IS NULL
+                  AND end_km IS NULL
+              )
             ORDER BY
                 CASE severity
                     WHEN 'critical' THEN 1
@@ -553,12 +590,13 @@ def get_active_road_incidents_for_road_ids(
                 END,
                 updated_at DESC,
                 id DESC
+            LIMIT :limit
         """
     ).bindparams(bindparam("road_ids", expanding=True))
 
     result = db.execute(
         statement,
-        {"road_ids": road_ids},
+        {"road_ids": road_ids, "limit": limit},
     )
 
     return [dict(row) for row in result.mappings()]
