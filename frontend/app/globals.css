@@ -187,6 +187,7 @@ h1 {
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 16px;
   margin-top: 24px;
 }
@@ -196,6 +197,11 @@ h1 {
   border: 1px solid #d9e2ea;
   border-radius: 8px;
   padding: 20px;
+}
+
+.detail-grid > .detail-section,
+.access-grid > .detail-section {
+  min-height: 330px;
 }
 
 .section-heading {
@@ -258,7 +264,8 @@ h1 {
 
 .access-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 16px;
   margin-top: 16px;
 }
@@ -393,13 +400,22 @@ h1 {
 
 .incident-group summary {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 68px minmax(0, 1fr) 32px;
   align-items: center;
   gap: 10px;
   min-height: 44px;
   padding: 10px 12px;
   cursor: pointer;
   list-style: none;
+}
+
+.incident-group summary > span:last-child {
+  text-align: right;
+}
+
+.incident-group summary .severity-pill {
+  justify-content: center;
+  width: 68px;
 }
 
 .incident-group summary::-webkit-details-marker {
