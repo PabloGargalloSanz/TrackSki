@@ -562,7 +562,78 @@ Limitaciones actuales:
   reales y no solo por region.
 - DGT solo guarda incidencias de carreteras configuradas en `roads`.
 
-## 12. Arquitectura de despliegue
+## 12. Geometrias OSM de carreteras
+
+Las geometrias reales de carreteras se pueden importar manualmente desde
+OpenStreetMap mediante Overpass API. Este job no se ejecuta en cron y no se
+lanza al recibir incidencias DGT. Sirve para completar `roads.route` de forma
+ocasional.
+
+Comando:
+
+```bash
+cd backend
+python -m app.jobs.import_osm_road_geometries
+```
+
+Reintentar solo una o varias carreteras:
+
+```bash
+python -m app.jobs.import_osm_road_geometries --code A-228
+python -m app.jobs.import_osm_road_geometries --code N-260 --code C-14
+```
+
+De momento importa las carreteras base configuradas para los accesos iniciales:
+
+```text
+A-23
+A-136
+A-139
+A-228
+A-2606
+A-2617
+C-14
+C-28
+CG-1
+CG-2
+N-123
+N-123a
+N-145
+N-230
+N-260
+N-260a
+N-330
+N-330a
+SC-22130-09
+VF-TE-01
+```
+
+El job:
+
+- Busca ways de OSM por `ref` de carretera dentro de una bbox concreta.
+- Hace una pausa y reintentos si Overpass responde con limite temporal o timeout.
+- Guarda `roads.route` como `MultiLineString` SRID 4326.
+- Actualiza `roads.updated_at`.
+- No cambia `data_source`.
+- No cambia `is_verified`.
+- Si una carretera falla, muestra aviso y continua con la siguiente.
+
+Verificar geometria guardada:
+
+```sql
+SELECT
+    code,
+    ST_GeometryType(route),
+    ST_NumGeometries(route),
+    ST_Length(route::geography) / 1000 AS length_km
+FROM roads
+WHERE route IS NOT NULL;
+```
+
+Las geometrias proceden de OpenStreetMap y deben atribuirse como:
+`© OpenStreetMap contributors`.
+
+## 13. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -590,7 +661,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 13. Traefik temporal
+## 14. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -622,7 +693,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 14. Staging y main
+## 15. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -660,7 +731,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 15. Despliegue automatico
+## 16. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -686,7 +757,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 16. Comprobaciones
+## 17. Comprobaciones
 
 Estado:
 
@@ -724,7 +795,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 17. Problemas habituales
+## 18. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -757,7 +828,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 18. Migracion futura a 80/443
+## 19. Migracion futura a 80/443
 
 No realizarla todavia.
 

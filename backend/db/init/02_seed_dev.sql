@@ -101,15 +101,15 @@ INSERT INTO roads (
 VALUES
     ('A-23', 'Autovía Mudéjar / Monrepós', NULL, 'manual', TRUE),
     ('N-330', 'N-330 Sabiñánigo - Jaca - Canfranc', NULL, 'manual', TRUE),
-    ('N-330A', 'N-330a Jaca - Canfranc - Candanchú - Astún', NULL, 'manual', TRUE),
+    ('N-330a', 'N-330a Jaca - Canfranc - Candanchú - Astún', NULL, 'manual', TRUE),
     ('SC-22130-09', 'Acceso final a Astún', NULL, 'manual', TRUE),
 
-    ('N-260A', 'N-260a Sabiñánigo - Biescas', NULL, 'manual', TRUE),
+    ('N-260a', 'N-260a Sabiñánigo - Biescas', NULL, 'manual', TRUE),
     ('A-136', 'A-136 Biescas - Formigal - Portalet', NULL, 'manual', TRUE),
     ('A-2606', 'A-2606 acceso Panticosa', NULL, 'manual', TRUE),
 
     ('N-123', 'N-123 Barbastro - Graus - Campo', NULL, 'manual', TRUE),
-    ('N-123A', 'N-123a Barbastro - Graus - Campo', NULL, 'manual', TRUE),
+    ('N-123a', 'N-123a Barbastro - Graus - Campo', NULL, 'manual', TRUE),
     ('A-139', 'A-139 Campo - Benasque - Cerler', NULL, 'manual', TRUE),
     ('A-2617', 'A-2617 acceso Cerler / Ampriu', NULL, 'manual', TRUE),
 
