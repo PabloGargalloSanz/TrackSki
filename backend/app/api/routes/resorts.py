@@ -211,7 +211,11 @@ def build_resort_access_status(
     db: Session,
     resort_id: int,
 ) -> ResortAccessStatusResponse:
-    access_roads = get_access_roads_by_resort_id(db, resort_id)
+    access_roads = get_access_roads_by_resort_id(
+        db,
+        resort_id,
+        include_route=False,
+    )
     road_ids = [row["road_id"] for row in access_roads]
     incidents = get_active_road_incidents_for_road_ids(db, road_ids, limit=30)
 
@@ -281,7 +285,7 @@ def retrieve_resort_summary(
 
     snow_report = get_latest_snow_report_by_resort_id(db, resort_id)
     weather_report = get_latest_weather_report_by_resort_id(db, resort_id)
-    roads = get_roads_by_resort_id(db, resort_id)
+    roads = get_roads_by_resort_id(db, resort_id, include_route=False)
     aemet_area = get_aemet_area_for_resort(resort)
     weather_alerts = (
         get_active_weather_alerts(db, areas=[aemet_area])

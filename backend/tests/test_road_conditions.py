@@ -54,7 +54,8 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         road_id = get_best_road_id_by_code(db, "A-136")
 
         self.assertEqual(road_id, 7)
-        _, params = db.execute.call_args.args
+        statement, params = db.execute.call_args.args
+        self.assertIn("UPPER(code) = UPPER(:road_code)", str(statement))
         self.assertEqual(params["road_code"], "A-136")
 
     def test_get_active_road_incidents_for_access_filters_noise(self) -> None:
@@ -68,7 +69,7 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(incidents, [])
         statement, params = db.execute.call_args.args
         sql = str(statement)
-        self.assertIn("updated_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'", sql)
+        self.assertIn("status IN ('active', 'planned')", sql)
         self.assertIn("severity = 'unknown'", sql)
         self.assertIn("incident_type IN ('unknown', 'other')", sql)
         self.assertIn("LIMIT :limit", sql)
@@ -176,6 +177,39 @@ class RoadConditionRepositoryTest(unittest.TestCase):
         self.assertEqual(params["data_source"], "dgt_datex2_v37")
         self.assertEqual(params["source_updated_at"], source_updated_at)
         self.assertEqual(params["raw_payload"], '{"source_ids": ["record-1"]}')
+
+    def test_upsert_road_incident_uses_canonical_road_code_when_road_id_exists(
+        self,
+    ) -> None:
+        db = Mock()
+        result = Mock()
+        result.scalar_one.return_value = 456
+        db.execute.return_value = result
+        incident = NormalizedRoadIncident(
+            source="dgt_datex2_v37",
+            source_id="record-n260a",
+            road_code="N-260A",
+            title="Obras en N-260A",
+            description="Obras en N-260A",
+            incident_type="roadworks",
+            status="active",
+            severity="medium",
+            start_km=None,
+            end_km=None,
+            direction=None,
+            latitude=None,
+            longitude=None,
+            starts_at=None,
+            ends_at=None,
+            reported_at=None,
+            updated_at=None,
+            raw_payload={"source_id": "record-n260a"},
+        )
+
+        upsert_road_incident(db, incident, road_id=7)
+
+        statement = str(db.execute.call_args.args[0])
+        self.assertIn("SELECT code FROM roads WHERE id = :road_id", statement)
 
 
 if __name__ == "__main__":

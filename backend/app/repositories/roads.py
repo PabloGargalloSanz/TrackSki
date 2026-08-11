@@ -43,15 +43,23 @@ def get_roads(db: Session) -> list[dict]:
     return [dict(row) for row in result.mappings()]
 
 
-def get_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
+def get_roads_by_resort_id(
+    db: Session,
+    resort_id: int,
+    *,
+    include_route: bool = True,
+) -> list[dict]:
+    route_expression = (
+        "ST_AsGeoJSON(roads.route)::json" if include_route else "NULL::json"
+    )
     result = db.execute(
         text(
-            """
+            f"""
             SELECT
                 roads.id,
                 roads.code,
                 roads.name,
-                ST_AsGeoJSON(roads.route)::json AS route,
+                {route_expression} AS route,
                 roads.data_source,
                 roads.is_verified,
                 latest_condition.status AS latest_status,
@@ -111,7 +119,7 @@ def get_best_road_id_by_code(db: Session, road_code: str) -> int | None:
             """
             SELECT id
             FROM roads
-            WHERE code = :road_code
+            WHERE UPPER(code) = UPPER(:road_code)
               AND data_source IN ('manual', 'dgt_datex2_v37', 'dgt')
             ORDER BY
                 is_verified DESC,
@@ -334,7 +342,10 @@ def upsert_road_incident(
                 :road_id,
                 :source,
                 :source_id,
-                :road_code,
+                COALESCE(
+                    (SELECT code FROM roads WHERE id = :road_id),
+                    :road_code
+                ),
                 :title,
                 :description,
                 :incident_type,
@@ -441,7 +452,7 @@ def get_active_road_incidents(
     filters = ["status IN ('active', 'planned')"]
     params = {"limit": limit}
     if road_code:
-        filters.append("road_code = :road_code")
+        filters.append("UPPER(road_code) = UPPER(:road_code)")
         params["road_code"] = road_code
     if severity:
         filters.append("severity = :severity")
@@ -494,10 +505,18 @@ def get_active_road_incidents(
     return [dict(row) for row in result.mappings()]
 
 
-def get_access_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
+def get_access_roads_by_resort_id(
+    db: Session,
+    resort_id: int,
+    *,
+    include_route: bool = True,
+) -> list[dict]:
+    route_expression = (
+        "ST_AsGeoJSON(roads.route)::json" if include_route else "NULL::json"
+    )
     result = db.execute(
         text(
-            """
+            f"""
             SELECT
                 resort_access_roads.id AS access_id,
                 resort_access_roads.access_role,
@@ -508,7 +527,7 @@ def get_access_roads_by_resort_id(db: Session, resort_id: int) -> list[dict]:
                 roads.id AS road_id,
                 roads.code,
                 roads.name,
-                ST_AsGeoJSON(roads.route)::json AS route,
+                {route_expression} AS route,
                 roads.data_source,
                 roads.is_verified,
                 latest_condition.status AS latest_status,
@@ -571,7 +590,6 @@ def get_active_road_incidents_for_road_ids(
             FROM road_incidents
             WHERE status IN ('active', 'planned')
               AND road_id IN :road_ids
-              AND updated_at >= CURRENT_TIMESTAMP - INTERVAL '14 days'
               AND NOT (
                   severity = 'unknown'
                   AND incident_type IN ('unknown', 'other')

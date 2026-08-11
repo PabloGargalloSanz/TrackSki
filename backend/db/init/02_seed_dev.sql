@@ -143,30 +143,30 @@ WITH access_data AS (
             -- ASTÚN
             ('Astún', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós: Nueno - Arguis - Lanave.', 3),
             ('Astún', 'N-330', 'primary', 614.000, 666.000, 'Tramo Sabiñánigo - Jaca - Canfranc.', 2),
-            ('Astún', 'N-330A', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú - Astún.', 1),
+            ('Astún', 'N-330a', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú - Astún.', 1),
             ('Astún', 'SC-22130-09', 'final_access', NULL, NULL, 'Entrada final a Astún.', 1),
 
             -- CANDANCHÚ
             ('Candanchú', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós: Nueno - Arguis - Lanave.', 3),
             ('Candanchú', 'N-330', 'primary', 614.000, 666.000, 'Tramo Sabiñánigo - Jaca - Canfranc.', 2),
-            ('Candanchú', 'N-330A', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú.', 1),
+            ('Candanchú', 'N-330a', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú.', 1),
 
             -- FORMIGAL
             ('Formigal', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós hacia Sabiñánigo/Biescas.', 3),
             ('Formigal', 'N-330', 'approach', 614.000, 633.000, 'Tramo de aproximación hacia Sabiñánigo.', 3),
-            ('Formigal', 'N-260A', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 2),
+            ('Formigal', 'N-260a', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 2),
             ('Formigal', 'A-136', 'final_access', 0.000, 27.000, 'Acceso por Valle de Tena: Biescas - Formigal - Portalet.', 1),
 
             -- PANTICOSA
             ('Panticosa', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós hacia Sabiñánigo/Biescas.', 3),
             ('Panticosa', 'N-330', 'approach', 614.000, 633.000, 'Tramo de aproximación hacia Sabiñánigo.', 3),
-            ('Panticosa', 'N-260A', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 2),
+            ('Panticosa', 'N-260a', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 2),
             ('Panticosa', 'A-136', 'primary', 0.000, 27.000, 'Acceso por Valle de Tena hacia Panticosa.', 1),
             ('Panticosa', 'A-2606', 'final_access', 0.000, 4.500, 'Acceso final a Panticosa.', 1),
 
             -- CERLER
             ('Cerler', 'N-123', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 3),
-            ('Cerler', 'N-123A', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 3),
+            ('Cerler', 'N-123a', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 3),
             ('Cerler', 'A-139', 'primary', 0.000, 63.000, 'Tramo Campo - Castejón de Sos - Benasque - Cerler.', 2),
             ('Cerler', 'A-2617', 'final_access', 0.000, 4.000, 'Subida final Cerler / Ampriu.', 1),
 
@@ -299,30 +299,30 @@ WITH segment_data AS (
             -- ASTÚN
             ('Zaragoza: Astún', 'Astún', 'A-23', 1, 'approach', 356.000, 394.000),
             ('Zaragoza: Astún', 'Astún', 'N-330', 2, 'primary', 614.000, 666.000),
-            ('Zaragoza: Astún', 'Astún', 'N-330A', 3, 'final_access', NULL, NULL),
+            ('Zaragoza: Astún', 'Astún', 'N-330a', 3, 'final_access', NULL, NULL),
             ('Zaragoza: Astún', 'Astún', 'SC-22130-09', 4, 'final_access', NULL, NULL),
 
             -- CANDANCHÚ
             ('Zaragoza: Candanchú', 'Candanchú', 'A-23', 1, 'approach', 356.000, 394.000),
             ('Zaragoza: Candanchú', 'Candanchú', 'N-330', 2, 'primary', 614.000, 666.000),
-            ('Zaragoza: Candanchú', 'Candanchú', 'N-330A', 3, 'final_access', NULL, NULL),
+            ('Zaragoza: Candanchú', 'Candanchú', 'N-330a', 3, 'final_access', NULL, NULL),
 
             -- FORMIGAL
             ('Zaragoza: Formigal', 'Formigal', 'A-23', 1, 'approach', 356.000, 394.000),
             ('Zaragoza: Formigal', 'Formigal', 'N-330', 2, 'approach', 614.000, 633.000),
-            ('Zaragoza: Formigal', 'Formigal', 'N-260A', 3, 'approach', 509.000, 517.000),
+            ('Zaragoza: Formigal', 'Formigal', 'N-260a', 3, 'approach', 509.000, 517.000),
             ('Zaragoza: Formigal', 'Formigal', 'A-136', 4, 'final_access', 0.000, 27.000),
 
             -- PANTICOSA
             ('Zaragoza: Panticosa', 'Panticosa', 'A-23', 1, 'approach', 356.000, 394.000),
             ('Zaragoza: Panticosa', 'Panticosa', 'N-330', 2, 'approach', 614.000, 633.000),
-            ('Zaragoza: Panticosa', 'Panticosa', 'N-260A', 3, 'approach', 509.000, 517.000),
+            ('Zaragoza: Panticosa', 'Panticosa', 'N-260a', 3, 'approach', 509.000, 517.000),
             ('Zaragoza: Panticosa', 'Panticosa', 'A-136', 4, 'primary', 0.000, 27.000),
             ('Zaragoza: Panticosa', 'Panticosa', 'A-2606', 5, 'final_access', 0.000, 4.500),
 
             -- CERLER
             ('Zaragoza: Cerler', 'Cerler', 'N-123', 1, 'approach', 0.000, 30.000),
-            ('Zaragoza: Cerler', 'Cerler', 'N-123A', 2, 'approach', 0.000, 30.000),
+            ('Zaragoza: Cerler', 'Cerler', 'N-123a', 2, 'approach', 0.000, 30.000),
             ('Zaragoza: Cerler', 'Cerler', 'A-139', 3, 'primary', 0.000, 63.000),
             ('Zaragoza: Cerler', 'Cerler', 'A-2617', 4, 'final_access', 0.000, 4.000),
 
