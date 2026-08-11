@@ -460,28 +460,24 @@ h1 {
 }
 
 .severity-pill--rojo,
-.severity-pill--critical,
-.status-chip--closed {
+.severity-pill--critical {
   border-color: #dc2626;
   color: #991b1b;
 }
 
 .severity-pill--naranja,
-.severity-pill--high,
-.status-chip--chains {
+.severity-pill--high {
   border-color: #ea580c;
   color: #9a3412;
 }
 
 .severity-pill--amarillo,
-.severity-pill--medium,
-.status-chip--affected {
+.severity-pill--medium {
   border-color: #d3a72c;
   color: #765b0a;
 }
 
-.severity-pill--low,
-.status-chip--caution {
+.severity-pill--low {
   border-color: #59a99f;
   color: var(--accent-strong);
 }
@@ -489,6 +485,55 @@ h1 {
 .status-chip--open {
   border-color: #16a34a;
   color: #166534;
+}
+
+.status-chip--caution {
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.status-chip--affected,
+.status-chip--chains {
+  border-color: #ea580c;
+  color: #9a3412;
+}
+
+.status-chip--closed {
+  border-color: #dc2626;
+  color: #991b1b;
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #c8d3dc;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-dot--open {
+  border-color: #16a34a;
+  color: #166534;
+}
+
+.status-dot--warning {
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.status-dot--danger {
+  border-color: #ea580c;
+  color: #9a3412;
+}
+
+.status-dot--closed {
+  border-color: #dc2626;
+  color: #991b1b;
 }
 
 @media (max-width: 680px) {

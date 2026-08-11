@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getResortSummary, type RoadIncident } from "../../../lib/api";
+import {
+  getResortSummary,
+  type ResortAccessRoad,
+  type RoadIncident,
+} from "../../../lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +21,15 @@ const severityLabels: Record<string, string> = {
   medium: "Medias",
   low: "Leves",
   unknown: "Sin clasificar",
+};
+
+const accessStatusLabels: Record<string, string> = {
+  open: "Abierto",
+  caution: "Precaucion",
+  affected: "Peligro",
+  chains: "Peligro",
+  closed: "Cerrado",
+  unknown: "Sin datos",
 };
 
 function formatDate(value: string): string {
@@ -43,6 +56,22 @@ function kmRange(incident: RoadIncident): string {
   return `km ${incident.start_km} - ${incident.end_km}`;
 }
 
+function incidentTitle(incident: RoadIncident): string {
+  if (incident.incident_type === "roadworks") {
+    return "Obras";
+  }
+
+  return incident.title ?? incident.incident_type;
+}
+
+function incidentDescription(incident: RoadIncident): string | null {
+  if (incident.incident_type === "roadworks") {
+    return null;
+  }
+
+  return incident.description ?? "Sin descripcion disponible";
+}
+
 function groupIncidentsBySeverity(incidents: RoadIncident[]) {
   return severityOrder
     .map((severity) => ({
@@ -51,6 +80,73 @@ function groupIncidentsBySeverity(incidents: RoadIncident[]) {
       incidents: incidents.filter((incident) => incident.severity === severity),
     }))
     .filter((group) => group.incidents.length > 0);
+}
+
+function accessStatusLabel(status: string): string {
+  return accessStatusLabels[status] ?? status;
+}
+
+function incidentsForRoad(
+  road: ResortAccessRoad,
+  incidents: RoadIncident[],
+): RoadIncident[] {
+  return incidents.filter((incident) => incident.road_id === road.road.id);
+}
+
+function roadAccessStatus(incidents: RoadIncident[]): {
+  label: string;
+  tone: string;
+} {
+  if (incidents.length === 0) {
+    return { label: "Abierto", tone: "open" };
+  }
+
+  if (
+    incidents.some(
+      (incident) =>
+        incident.incident_type === "road_closed" &&
+        ["critical", "high"].includes(incident.severity),
+    )
+  ) {
+    return { label: "Cerrado", tone: "closed" };
+  }
+
+  if (
+    incidents.some((incident) => ["critical", "high"].includes(incident.severity))
+  ) {
+    return { label: "Peligro", tone: "danger" };
+  }
+
+  return { label: "Precaucion", tone: "warning" };
+}
+
+function accessProblemSummary(incidents: RoadIncident[]): string {
+  if (incidents.length === 0) {
+    return "";
+  }
+
+  const labels = incidents.map((incident) => incidentTypeLabel(incident));
+  const uniqueLabels = Array.from(new Set(labels));
+
+  return uniqueLabels.slice(0, 3).join(", ");
+}
+
+function incidentTypeLabel(incident: RoadIncident): string {
+  const labels: Record<string, string> = {
+    road_closed: "Corte de carretera",
+    chains_required: "Cadenas",
+    snow: "Nieve",
+    ice: "Hielo",
+    hail: "Granizo",
+    roadworks: "Obras",
+    accident: "Accidente",
+    restriction: "Restriccion",
+    congestion: "Retencion",
+    obstruction: "Obstaculo",
+    weather: "Meteorologia",
+  };
+
+  return labels[incident.incident_type] ?? incident.title ?? incident.incident_type;
 }
 
 export default async function ResortDetailPage({
@@ -270,41 +366,37 @@ export default async function ResortDetailPage({
             <strong
               className={`status-chip status-chip--${accessStatus.overall_status}`}
             >
-              {accessStatus.overall_status}
+              {accessStatusLabel(accessStatus.overall_status)}
             </strong>
           </div>
           {accessStatus.roads.length > 0 ? (
             <div className="road-list">
-              {accessStatus.roads.map((accessRoad) => (
-                <article className="road-row" key={accessRoad.id}>
-                  <div>
-                    <h3>{accessRoad.road.name ?? accessRoad.road.code}</h3>
-                    <p>
-                      {accessRoad.segment_description ??
-                        accessRoad.road.latest_condition?.details ??
-                        "Sin observaciones"}
-                    </p>
-                    <p className="meta-line">
-                      {accessRoad.access_role}
-                      {accessRoad.from_km !== null || accessRoad.to_km !== null
-                        ? ` - ${valueOrDash(accessRoad.from_km)}-${valueOrDash(
-                            accessRoad.to_km,
-                          )} km`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="road-status">
-                    <strong>
-                      {accessRoad.road.latest_condition?.status ?? "Sin datos"}
-                    </strong>
-                    {accessRoad.road.latest_condition && (
-                      <time>
-                        {formatDate(accessRoad.road.latest_condition.reported_at)}
-                      </time>
-                    )}
-                  </div>
-                </article>
-              ))}
+              {accessStatus.roads.map((accessRoad) => {
+                const roadIncidents = incidentsForRoad(
+                  accessRoad,
+                  accessStatus.incidents,
+                );
+                const status = roadAccessStatus(roadIncidents);
+                const latestIncident = roadIncidents[0];
+                const problemSummary = accessProblemSummary(roadIncidents);
+
+                return (
+                  <article className="road-row" key={accessRoad.id}>
+                    <div>
+                      <h3>{accessRoad.road.name ?? accessRoad.road.code}</h3>
+                      {problemSummary && <p>{problemSummary}</p>}
+                    </div>
+                    <div className="road-status">
+                      <strong className={`status-dot status-dot--${status.tone}`}>
+                        {status.label}
+                      </strong>
+                      {latestIncident && (
+                        <time>{formatDate(latestIncident.updated_at)}</time>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <p className="empty-message">
@@ -352,8 +444,10 @@ export default async function ResortDetailPage({
                     {group.incidents.map((incident) => (
                       <article className="incident-row" key={incident.id}>
                         <div>
-                          <h4>{incident.title ?? incident.incident_type}</h4>
-                          <p>{incident.description ?? "Sin descripcion disponible"}</p>
+                          <h4>{incidentTitle(incident)}</h4>
+                          {incidentDescription(incident) && (
+                            <p>{incidentDescription(incident)}</p>
+                          )}
                           <p className="meta-line">
                             {incident.road_code ?? "Carretera sin codigo"} -{" "}
                             {kmRange(incident)}
