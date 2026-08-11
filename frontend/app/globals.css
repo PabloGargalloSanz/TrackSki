@@ -398,9 +398,13 @@ h1 {
   overflow: hidden;
 }
 
+.incident-group[open] {
+  border-color: #e3e9ee;
+}
+
 .incident-group summary {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(0, 1fr) 32px;
   align-items: center;
   gap: 10px;
   min-height: 44px;
@@ -409,25 +413,24 @@ h1 {
   list-style: none;
 }
 
-.incident-group summary > span:last-child {
-  text-align: right;
+.incident-group summary .severity-pill {
+  justify-self: start;
+  min-width: 78px;
+  justify-content: center;
+  text-transform: none;
 }
 
-.incident-group summary .severity-pill {
-  justify-content: center;
-  width: 68px;
+.incident-group summary > span:last-child {
+  text-align: right;
 }
 
 .incident-group summary::-webkit-details-marker {
   display: none;
 }
 
-.incident-group[open] summary {
-  border-bottom: 1px solid #e3e9ee;
-}
-
 .incident-group .incident-list {
   padding: 0 12px 12px;
+  border-top: 1px solid #e3e9ee;
 }
 
 .incident-group .incident-row {

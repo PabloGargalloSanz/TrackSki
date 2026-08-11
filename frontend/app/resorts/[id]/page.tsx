@@ -45,31 +45,28 @@ function valueOrDash(value: number | string | null, suffix = ""): string {
 }
 
 function kmRange(incident: RoadIncident): string {
-  if (incident.start_km === null && incident.end_km === null) {
+  const { start_km: start, end_km: end } = incident;
+
+  if (start === null && end === null) {
     return "Tramo sin km informado";
   }
 
-  if (incident.start_km === incident.end_km || incident.end_km === null) {
-    return `km ${incident.start_km}`;
+  const startKm = Math.round(start ?? end ?? 0);
+  const endKm = end === null ? null : Math.round(end);
+
+  if (endKm === null || startKm === endKm) {
+    return `km ${startKm}`;
   }
 
-  return `km ${incident.start_km} - ${incident.end_km}`;
+  return `km ${startKm} - ${endKm}`;
 }
 
 function incidentTitle(incident: RoadIncident): string {
-  if (incident.incident_type === "roadworks") {
-    return "Obras";
-  }
-
-  return incident.title ?? incident.incident_type;
+  return incident.road_code ?? "Carretera sin codigo";
 }
 
-function incidentDescription(incident: RoadIncident): string | null {
-  if (incident.incident_type === "roadworks") {
-    return null;
-  }
-
-  return incident.description ?? "Sin descripcion disponible";
+function incidentSummary(incident: RoadIncident): string {
+  return `${incidentTypeLabel(incident)} - ${kmRange(incident)}`;
 }
 
 function groupIncidentsBySeverity(incidents: RoadIncident[]) {
@@ -435,9 +432,8 @@ export default async function ResortDetailPage({
                     <span
                       className={`severity-pill severity-pill--${group.severity}`}
                     >
-                      {group.severity}
+                      {group.label}
                     </span>
-                    <strong>{group.label}</strong>
                     <span>{group.incidents.length}</span>
                   </summary>
                   <div className="incident-list">
@@ -445,14 +441,7 @@ export default async function ResortDetailPage({
                       <article className="incident-row" key={incident.id}>
                         <div>
                           <h4>{incidentTitle(incident)}</h4>
-                          {incidentDescription(incident) && (
-                            <p>{incidentDescription(incident)}</p>
-                          )}
-                          <p className="meta-line">
-                            {incident.road_code ?? "Carretera sin codigo"} -{" "}
-                            {kmRange(incident)}
-                            {incident.access_role ? ` - ${incident.access_role}` : ""}
-                          </p>
+                          <p className="meta-line">{incidentSummary(incident)}</p>
                         </div>
                         <div className="road-status">
                           <strong>{incident.status}</strong>
