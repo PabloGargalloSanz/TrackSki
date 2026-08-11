@@ -34,6 +34,7 @@ from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_alert import WeatherAlert
 from app.schemas.weather_report import WeatherReport
 from app.services.road_access import (
+    compact_roadwork_incidents,
     km_ranges_overlap,
     most_relevant_access_role,
     overall_access_status,
@@ -244,12 +245,13 @@ def build_resort_access_status(
             affected_incidents.append(incident_with_access_role)
 
     alternatives = get_road_alternatives_by_resort_id(db, resort_id)
+    visible_incidents = compact_roadwork_incidents(affected_incidents)
 
     return ResortAccessStatusResponse(
         resort_id=resort_id,
         overall_status=overall_access_status(affected_incidents),
         roads=[serialize_access_road(row) for row in access_roads],
-        incidents=[serialize_road_incident(row) for row in affected_incidents],
+        incidents=[serialize_road_incident(row) for row in visible_incidents],
         alternatives=[serialize_road_alternative(row) for row in alternatives],
     )
 

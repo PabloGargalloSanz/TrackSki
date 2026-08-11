@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 import unittest
 
 from app.services.road_access import (
+    compact_roadwork_incidents,
     km_ranges_overlap,
     most_relevant_access_role,
     overall_access_status,
@@ -144,6 +146,79 @@ class RoadAccessTest(unittest.TestCase):
             ),
             "affected",
         )
+
+    def test_compact_roadwork_incidents_groups_same_road(self) -> None:
+        incidents = [
+            {
+                "id": 1,
+                "road_id": 10,
+                "road_code": "A-136",
+                "title": "Obras en A-136",
+                "description": "Obras en A-136, km 0.0-17.5",
+                "incident_type": "roadworks",
+                "status": "active",
+                "severity": "medium",
+                "start_km": Decimal("0.0"),
+                "end_km": Decimal("17.5"),
+                "direction": "northBound",
+                "updated_at": datetime(2026, 8, 11, 8, tzinfo=timezone.utc),
+                "access_role": "final_access",
+            },
+            {
+                "id": 2,
+                "road_id": 10,
+                "road_code": "A-136",
+                "title": "Obras en A-136",
+                "description": "Obras en A-136, km 0.0-26.9",
+                "incident_type": "roadworks",
+                "status": "active",
+                "severity": "medium",
+                "start_km": Decimal("0.0"),
+                "end_km": Decimal("26.9"),
+                "direction": "southBound",
+                "updated_at": datetime(2026, 8, 11, 9, tzinfo=timezone.utc),
+                "access_role": "final_access",
+            },
+        ]
+
+        compacted = compact_roadwork_incidents(incidents)
+
+        self.assertEqual(len(compacted), 1)
+        self.assertEqual(compacted[0]["id"], 2)
+        self.assertEqual(compacted[0]["road_code"], "A-136")
+        self.assertEqual(compacted[0]["title"], "Obras en A-136")
+        self.assertEqual(compacted[0]["start_km"], Decimal("0.0"))
+        self.assertEqual(compacted[0]["end_km"], Decimal("26.9"))
+        self.assertEqual(compacted[0]["direction"], "varios sentidos")
+        self.assertIn("Agrupa 2 incidencias activas", compacted[0]["description"])
+
+    def test_compact_roadwork_incidents_keeps_other_incidents(self) -> None:
+        incidents = [
+            {
+                "id": 1,
+                "road_id": 10,
+                "road_code": "A-136",
+                "incident_type": "roadworks",
+                "severity": "medium",
+                "start_km": Decimal("0.0"),
+                "end_km": Decimal("17.5"),
+                "updated_at": datetime(2026, 8, 11, 8, tzinfo=timezone.utc),
+                "access_role": "final_access",
+            },
+            {
+                "id": 2,
+                "road_id": 10,
+                "road_code": "A-136",
+                "incident_type": "obstruction",
+                "severity": "low",
+                "updated_at": datetime(2026, 8, 11, 9, tzinfo=timezone.utc),
+                "access_role": "final_access",
+            },
+        ]
+
+        compacted = compact_roadwork_incidents(incidents)
+
+        self.assertEqual(len(compacted), 2)
 
 
 if __name__ == "__main__":
