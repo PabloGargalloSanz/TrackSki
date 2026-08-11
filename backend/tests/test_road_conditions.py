@@ -6,6 +6,7 @@ import unittest
 from app.repositories.roads import (
     create_road_condition,
     get_active_road_incidents_for_road_ids,
+    get_access_roads_by_resort_id,
     get_best_road_id_by_code,
     mark_stale_dgt_incidents_resolved,
     upsert_road_condition_summary,
@@ -210,6 +211,22 @@ class RoadConditionRepositoryTest(unittest.TestCase):
 
         statement = str(db.execute.call_args.args[0])
         self.assertIn("SELECT code FROM roads WHERE id = :road_id", statement)
+
+    def test_get_access_roads_orders_by_access_role_priority(self) -> None:
+        db = Mock()
+        result = Mock()
+        result.mappings.return_value = []
+        db.execute.return_value = result
+
+        get_access_roads_by_resort_id(db, 1, include_route=False)
+
+        statement, params = db.execute.call_args.args
+        sql = str(statement)
+        self.assertIn("WHEN 'final_access' THEN 1", sql)
+        self.assertIn("WHEN 'primary' THEN 2", sql)
+        self.assertIn("WHEN 'approach' THEN 3", sql)
+        self.assertIn("resort_access_roads.priority", sql)
+        self.assertEqual(params["resort_id"], 1)
 
 
 if __name__ == "__main__":

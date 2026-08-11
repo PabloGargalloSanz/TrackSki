@@ -82,7 +82,17 @@ def get_roads_by_resort_id(
             ) AS latest_condition ON TRUE
             WHERE resort_access_roads.resort_id = :resort_id
               AND resort_access_roads.is_active = TRUE
-            ORDER BY resort_access_roads.priority, roads.code
+            ORDER BY
+                CASE resort_access_roads.access_role
+                    WHEN 'final_access' THEN 1
+                    WHEN 'primary' THEN 2
+                    WHEN 'approach' THEN 3
+                    WHEN 'secondary' THEN 4
+                    WHEN 'alternative' THEN 5
+                    ELSE 6
+                END,
+                resort_access_roads.priority,
+                roads.code
             """
         ),
         {"resort_id": resort_id},
@@ -549,7 +559,17 @@ def get_access_roads_by_resort_id(
             ) AS latest_condition ON TRUE
             WHERE resort_access_roads.resort_id = :resort_id
               AND resort_access_roads.is_active = TRUE
-            ORDER BY resort_access_roads.priority, roads.code
+            ORDER BY
+                CASE resort_access_roads.access_role
+                    WHEN 'final_access' THEN 1
+                    WHEN 'primary' THEN 2
+                    WHEN 'approach' THEN 3
+                    WHEN 'secondary' THEN 4
+                    WHEN 'alternative' THEN 5
+                    ELSE 6
+                END,
+                resort_access_roads.priority,
+                roads.code
             """
         ),
         {"resort_id": resort_id},

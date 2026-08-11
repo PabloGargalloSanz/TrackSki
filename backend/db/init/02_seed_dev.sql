@@ -141,32 +141,32 @@ WITH access_data AS (
     FROM (
         VALUES
             -- ASTÚN
-            ('Astún', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós: Nueno - Arguis - Lanave.', 3),
+            ('Astún', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós: Nueno - Arguis - Lanave.', 1),
             ('Astún', 'N-330', 'primary', 614.000, 666.000, 'Tramo Sabiñánigo - Jaca - Canfranc.', 2),
-            ('Astún', 'N-330a', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú - Astún.', 1),
             ('Astún', 'SC-22130-09', 'final_access', NULL, NULL, 'Entrada final a Astún.', 1),
+            ('Astún', 'N-330a', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú - Astún.', 2),
 
             -- CANDANCHÚ
-            ('Candanchú', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós: Nueno - Arguis - Lanave.', 3),
+            ('Candanchú', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós: Nueno - Arguis - Lanave.', 1),
             ('Candanchú', 'N-330', 'primary', 614.000, 666.000, 'Tramo Sabiñánigo - Jaca - Canfranc.', 2),
             ('Candanchú', 'N-330a', 'final_access', NULL, NULL, 'Subida final Jaca - Canfranc - Candanchú.', 1),
 
             -- FORMIGAL
             ('Formigal', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós hacia Sabiñánigo/Biescas.', 3),
-            ('Formigal', 'N-330', 'approach', 614.000, 633.000, 'Tramo de aproximación hacia Sabiñánigo.', 3),
-            ('Formigal', 'N-260a', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 2),
+            ('Formigal', 'N-330', 'approach', 614.000, 633.000, 'Tramo de aproximación hacia Sabiñánigo.', 2),
+            ('Formigal', 'N-260a', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 1),
             ('Formigal', 'A-136', 'final_access', 0.000, 27.000, 'Acceso por Valle de Tena: Biescas - Formigal - Portalet.', 1),
 
             -- PANTICOSA
             ('Panticosa', 'A-23', 'approach', 356.000, 394.000, 'Tramo Monrepós hacia Sabiñánigo/Biescas.', 3),
-            ('Panticosa', 'N-330', 'approach', 614.000, 633.000, 'Tramo de aproximación hacia Sabiñánigo.', 3),
-            ('Panticosa', 'N-260a', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 2),
+            ('Panticosa', 'N-330', 'approach', 614.000, 633.000, 'Tramo de aproximación hacia Sabiñánigo.', 2),
+            ('Panticosa', 'N-260a', 'approach', 509.000, 517.000, 'Tramo Sabiñánigo - Biescas.', 1),
             ('Panticosa', 'A-136', 'primary', 0.000, 27.000, 'Acceso por Valle de Tena hacia Panticosa.', 1),
             ('Panticosa', 'A-2606', 'final_access', 0.000, 4.500, 'Acceso final a Panticosa.', 1),
 
             -- CERLER
-            ('Cerler', 'N-123', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 3),
-            ('Cerler', 'N-123a', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 3),
+            ('Cerler', 'N-123', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 2),
+            ('Cerler', 'N-123a', 'approach', 0.000, 30.000, 'Tramo Barbastro - Graus - Campo.', 1),
             ('Cerler', 'A-139', 'primary', 0.000, 63.000, 'Tramo Campo - Castejón de Sos - Benasque - Cerler.', 2),
             ('Cerler', 'A-2617', 'final_access', 0.000, 4.000, 'Subida final Cerler / Ampriu.', 1),
 
@@ -175,10 +175,10 @@ WITH access_data AS (
             ('Baqueira Beret', 'C-28', 'final_access', NULL, NULL, 'Tramo Vielha - Baqueira.', 1),
 
             -- GRANDVALIRA
-            ('Grandvalira', 'C-14', 'approach', 119.000, 178.000, 'Eje del Segre: Ponts - Oliana - Adrall.', 3),
-            ('Grandvalira', 'N-260', 'approach', 227.600, 234.000, 'Tramo de conexión hacia La Seu d''Urgell.', 3),
+            ('Grandvalira', 'C-14', 'approach', 119.000, 178.000, 'Eje del Segre: Ponts - Oliana - Adrall.', 2),
+            ('Grandvalira', 'N-260', 'approach', 227.600, 234.000, 'Tramo de conexión hacia La Seu d''Urgell.', 1),
             ('Grandvalira', 'N-145', 'primary', 0.000, 9.000, 'Tramo La Seu d''Urgell - frontera de Andorra.', 2),
-            ('Grandvalira', 'CG-1', 'primary', NULL, NULL, 'Acceso principal en Andorra.', 2),
+            ('Grandvalira', 'CG-1', 'primary', NULL, NULL, 'Acceso principal en Andorra.', 1),
             ('Grandvalira', 'CG-2', 'final_access', NULL, NULL, 'Eje Encamp - Canillo - Soldeu - Pas de la Casa.', 1),
 
             -- VALDELINARES
