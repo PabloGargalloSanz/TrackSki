@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 CRITICAL_SEVERITIES = {"critical", "high"}
@@ -16,6 +17,13 @@ ROAD_CONDITION_STATUS_PRIORITY = {
     "chains": 2,
     "affected": 3,
     "caution": 4,
+    "unknown": 5,
+}
+SEVERITY_PRIORITY = {
+    "critical": 1,
+    "high": 2,
+    "medium": 3,
+    "low": 4,
     "unknown": 5,
 }
 
@@ -120,3 +128,114 @@ def _road_condition_status_from_incident(incident: dict) -> str:
         return "caution"
 
     return "unknown"
+
+
+def compact_roadwork_incidents(incidents: list[dict]) -> list[dict]:
+    grouped: dict[tuple[int | None, str | None, str | None], list[dict]] = {}
+    compacted = []
+
+    for incident in incidents:
+        if incident.get("incident_type") != "roadworks":
+            compacted.append(incident)
+            continue
+
+        key = (
+            incident.get("road_id"),
+            _normalized_road_code(incident.get("road_code")),
+            incident.get("access_role"),
+        )
+        grouped.setdefault(key, []).append(incident)
+
+    for group in grouped.values():
+        if len(group) == 1:
+            compacted.append(group[0])
+            continue
+
+        compacted.append(_merge_roadwork_group(group))
+
+    return sorted(
+        compacted,
+        key=lambda incident: (
+            SEVERITY_PRIORITY.get(incident.get("severity"), 99),
+            -_timestamp(incident.get("updated_at")),
+            -(incident.get("id") or 0),
+        ),
+    )
+
+
+def _merge_roadwork_group(incidents: list[dict]) -> dict:
+    latest_incident = max(
+        incidents,
+        key=lambda incident: (
+            incident.get("updated_at") is not None,
+            incident.get("updated_at"),
+            incident.get("id"),
+        ),
+    )
+    merged = dict(latest_incident)
+    road_code = latest_incident.get("road_code")
+    start_km = _min_present(incident.get("start_km") for incident in incidents)
+    end_km = _max_present(incident.get("end_km") for incident in incidents)
+    severity = min(
+        (incident.get("severity") for incident in incidents),
+        key=lambda severity: SEVERITY_PRIORITY.get(severity, 99),
+    )
+
+    merged["start_km"] = start_km
+    merged["end_km"] = end_km
+    merged["severity"] = severity
+    merged["title"] = f"Obras en {road_code}" if road_code else "Obras"
+    merged["description"] = _build_roadwork_description(
+        road_code,
+        start_km,
+        end_km,
+        len(incidents),
+    )
+    merged["direction"] = _merged_direction(incidents)
+
+    return merged
+
+
+def _normalized_road_code(value: str | None) -> str | None:
+    return value.upper() if value else None
+
+
+def _min_present(values) -> Decimal | None:
+    present_values = [value for value in values if value is not None]
+    return min(present_values) if present_values else None
+
+
+def _max_present(values) -> Decimal | None:
+    present_values = [value for value in values if value is not None]
+    return max(present_values) if present_values else None
+
+
+def _build_roadwork_description(
+    road_code: str | None,
+    start_km: Decimal | None,
+    end_km: Decimal | None,
+    count: int,
+) -> str:
+    title = f"Obras en {road_code}" if road_code else "Obras"
+    if start_km is None or end_km is None:
+        return f"{title}. Agrupa {count} incidencias activas."
+    if start_km == end_km:
+        return f"{title}, km {start_km}. Agrupa {count} incidencias activas."
+    return f"{title}, km {start_km}-{end_km}. Agrupa {count} incidencias activas."
+
+
+def _merged_direction(incidents: list[dict]) -> str | None:
+    directions = {
+        incident.get("direction")
+        for incident in incidents
+        if incident.get("direction")
+    }
+    if not directions:
+        return None
+    if len(directions) == 1:
+        return directions.pop()
+    return "varios sentidos"
+
+
+def _timestamp(value: datetime | None) -> float:
+    return value.timestamp() if value else 0
