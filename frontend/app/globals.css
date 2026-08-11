@@ -133,26 +133,38 @@ h1 {
   color: var(--accent-strong);
 }
 
-.coordinates {
+.coordinates,
+.resort-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 20px 0 0;
 }
 
-.coordinates div {
+.coordinates div,
+.resort-summary-grid div {
   padding-top: 12px;
   border-top: 1px solid #e3e9ee;
 }
 
-.coordinates dt {
+.coordinates dt,
+.resort-summary-grid dt {
   color: var(--muted);
   font-size: 12px;
+  text-align: center;
 }
 
-.coordinates dd {
+.coordinates dd,
+.resort-summary-grid dd {
   margin: 4px 0 0;
   font-weight: 700;
+  text-align: center;
+}
+
+.resort-summary-grid .status-chip {
+  justify-content: center;
+  width: 104px;
+  min-height: 22px;
 }
 
 .status-panel {
