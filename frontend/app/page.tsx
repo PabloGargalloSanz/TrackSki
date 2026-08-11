@@ -101,10 +101,10 @@ function accessStatusTone(summary: ResortSummary | null): string {
 function skiableKm(summary: ResortSummary | null): string {
   const snow = summary?.latest_snow_report;
   if (!snow) {
-    return "Sin datos";
+    return "0 / 0 km";
   }
 
-  return `${snow.open_km}/${snow.total_km} km`;
+  return `${snow.open_km} / ${snow.total_km} km`;
 }
 
 export default async function Home() {
