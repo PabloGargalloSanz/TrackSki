@@ -18,12 +18,84 @@ const accessStatusLabels: Record<string, string> = {
   unknown: "Sin datos",
 };
 
-function accessStatusLabel(status: string | null | undefined): string {
+const incidentAccessLabels: Record<string, string> = {
+  road_closed: "Cerrado",
+  chains_required: "Cadenas",
+  snow: "Nieve",
+  ice: "Hielo",
+  hail: "Granizo",
+  roadworks: "Obras",
+  obstruction: "Obstaculo",
+  accident: "Accidente",
+  restriction: "Restriccion",
+  congestion: "Retencion",
+  weather: "Meteo",
+};
+
+const incidentAccessTones: Record<string, string> = {
+  road_closed: "closed",
+  chains_required: "danger",
+  snow: "danger",
+  ice: "danger",
+  hail: "danger",
+  roadworks: "roadworks",
+  obstruction: "warning",
+  accident: "danger",
+  restriction: "warning",
+  congestion: "warning",
+  weather: "warning",
+};
+
+const incidentTypePriority = [
+  "road_closed",
+  "chains_required",
+  "snow",
+  "ice",
+  "hail",
+  "accident",
+  "restriction",
+  "obstruction",
+  "congestion",
+  "weather",
+  "roadworks",
+];
+
+function mainAccessIncidentType(summary: ResortSummary | null): string | null {
+  const incidents = summary?.access_status.incidents ?? [];
+
+  return (
+    incidentTypePriority.find((incidentType) =>
+      incidents.some((incident) => incident.incident_type === incidentType),
+    ) ?? null
+  );
+}
+
+function accessStatusLabel(summary: ResortSummary | null): string {
+  const status = summary?.access_status.overall_status;
   if (!status) {
     return "Sin datos";
   }
 
+  const incidentType = mainAccessIncidentType(summary);
+  if (incidentType) {
+    return incidentAccessLabels[incidentType] ?? accessStatusLabels[status] ?? status;
+  }
+
   return accessStatusLabels[status] ?? status;
+}
+
+function accessStatusTone(summary: ResortSummary | null): string {
+  const status = summary?.access_status.overall_status;
+  if (!status) {
+    return "unknown";
+  }
+
+  const incidentType = mainAccessIncidentType(summary);
+  if (incidentType) {
+    return incidentAccessTones[incidentType] ?? status;
+  }
+
+  return status;
 }
 
 function skiableKm(summary: ResortSummary | null): string {
@@ -87,7 +159,7 @@ export default async function Home() {
         <section className="resort-grid" aria-label="Listado de estaciones">
           {resorts.map((resort) => {
             const summary = summaries.get(resort.id) ?? null;
-            const accessStatus = summary?.access_status.overall_status ?? null;
+            const accessStatusToneValue = accessStatusTone(summary);
 
             return (
               <Link
@@ -124,11 +196,9 @@ export default async function Home() {
                       <dt>Accesos</dt>
                       <dd>
                         <span
-                          className={`status-chip status-chip--${
-                            accessStatus ?? "unknown"
-                          }`}
+                          className={`status-chip status-chip--${accessStatusToneValue}`}
                         >
-                          {accessStatusLabel(accessStatus)}
+                          {accessStatusLabel(summary)}
                         </span>
                       </dd>
                     </div>

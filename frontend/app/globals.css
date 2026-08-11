@@ -502,13 +502,16 @@ h1 {
   color: #166534;
 }
 
-.status-chip--caution {
+.status-chip--caution,
+.status-chip--warning,
+.status-chip--roadworks {
   border-color: #f59e0b;
   color: #92400e;
 }
 
 .status-chip--affected,
-.status-chip--chains {
+.status-chip--chains,
+.status-chip--danger {
   border-color: #ea580c;
   color: #9a3412;
 }
