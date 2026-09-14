@@ -72,6 +72,13 @@ export type LineString = {
   coordinates: [number, number][];
 };
 
+export type MultiLineString = {
+  type: "MultiLineString";
+  coordinates: [number, number][][];
+};
+
+export type RoadGeometry = LineString | MultiLineString;
+
 export type Point = {
   type: "Point";
   coordinates: [number, number];
@@ -81,7 +88,7 @@ export type Road = {
   id: number;
   code: string;
   name: string | null;
-  route: LineString | null;
+  route: RoadGeometry | null;
   latest_condition: {
     status: string;
     severity: string;
@@ -115,7 +122,7 @@ export type RoadIncident = {
   end_km: number | null;
   direction: string | null;
   location: Point | null;
-  affected_route: LineString | null;
+  affected_route: RoadGeometry | null;
   starts_at: string | null;
   ends_at: string | null;
   reported_at: string | null;
@@ -166,6 +173,13 @@ export type ResortSummary = {
   access_status: ResortAccessStatus;
 };
 
+export type ResortMap = {
+  resort: Resort;
+  overall_status: string;
+  roads: ResortAccessRoad[];
+  incidents: RoadIncident[];
+};
+
 const internalApiUrl =
   process.env.INTERNAL_API_URL?.replace(/\/$/, "") ?? "http://localhost:3001";
 
@@ -197,4 +211,22 @@ export async function getResortSummary(
   }
 
   return response.json() as Promise<ResortSummary>;
+}
+
+export async function getResortMap(
+  resortId: number,
+): Promise<ResortMap | null> {
+  const response = await fetch(`${internalApiUrl}/resorts/${resortId}/map`, {
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`API request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<ResortMap>;
 }
