@@ -142,6 +142,39 @@ function accessPointLabel(description: string | null, fallback: string): string 
     : normalizedLabel;
 }
 
+function incidentTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    road_closed: "Cortes",
+    chains_required: "Cadenas",
+    snow: "Nieve",
+    ice: "Hielo",
+    hail: "Granizo",
+    roadworks: "Obras",
+    accident: "Accidentes",
+    restriction: "Restricciones",
+    congestion: "Retenciones",
+    obstruction: "Obstaculos",
+    weather: "Meteorologia",
+  };
+
+  return labels[type] ?? type;
+}
+
+function incidentSummary(incidents: RoadIncident[]) {
+  const counts = incidents.reduce<Record<string, number>>((summary, incident) => {
+    summary[incident.incident_type] = (summary[incident.incident_type] ?? 0) + 1;
+    return summary;
+  }, {});
+
+  return Object.entries(counts)
+    .map(([type, count]) => ({
+      type,
+      label: incidentTypeLabel(type),
+      count,
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
 function incidentTone(incidents: RoadIncident[]): string {
   if (
     incidents.some(
@@ -180,6 +213,7 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
     lines: geometryLines(accessRoad.road.route),
     incidents: incidentsForRoad(accessRoad.road.id, mapData.incidents),
   }));
+  const incidentSummaryItems = incidentSummary(mapData.incidents);
 
   return (
     <section className="detail-section map-section">
@@ -295,6 +329,37 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
             </text>
           </g>
         </svg>
+      </div>
+
+      <div className="access-map-legend">
+        <div className="access-map-legend__status">
+          <span>
+            <i className="legend-line legend-line--open" />
+            Abierto
+          </span>
+          <span>
+            <i className="legend-line legend-line--warning" />
+            Precaucion
+          </span>
+          <span>
+            <i className="legend-line legend-line--danger" />
+            Peligro
+          </span>
+          <span>
+            <i className="legend-line legend-line--closed" />
+            Cerrado
+          </span>
+        </div>
+
+        {incidentSummaryItems.length > 0 && (
+          <div className="access-map-legend__incidents">
+            {incidentSummaryItems.map((item) => (
+              <span key={item.type}>
+                {item.label}: {item.count}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

@@ -388,6 +388,52 @@ h1 {
   stroke-width: 1;
 }
 
+.access-map-legend {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.access-map-legend__status,
+.access-map-legend__incidents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.access-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 22px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.legend-line--open {
+  background: #16a34a;
+}
+
+.legend-line--warning {
+  background: #f59e0b;
+}
+
+.legend-line--danger {
+  background: #ea580c;
+}
+
+.legend-line--closed {
+  background: #dc2626;
+}
+
 .forecast-card-list {
   display: grid;
   grid-template-columns: repeat(7, minmax(132px, 1fr));
