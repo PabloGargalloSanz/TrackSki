@@ -32,6 +32,15 @@ const accessStatusLabels: Record<string, string> = {
   unknown: "Sin datos",
 };
 
+function formatForecastDate(value: string): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Madrid",
+  }).format(new Date(`${value}T12:00:00Z`));
+}
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("es-ES", {
     dateStyle: "medium",
@@ -42,6 +51,10 @@ function formatDate(value: string): string {
 
 function valueOrDash(value: number | string | null, suffix = ""): string {
   return value === null ? "-" : `${value}${suffix}`;
+}
+
+function compactNumber(value: number | null): string {
+  return value === null ? "-" : new Intl.NumberFormat("es-ES").format(value);
 }
 
 function kmRange(incident: RoadIncident): string {
@@ -184,6 +197,7 @@ export default async function ResortDetailPage({
     resort,
     latest_snow_report: snow,
     latest_weather_report: weather,
+    weather_forecasts: forecasts,
     weather_alerts: alerts,
     access_status: accessStatus,
   } = summary;
@@ -347,6 +361,7 @@ export default async function ResortDetailPage({
                   </p>
                 )}
               </div>
+
             </>
           ) : (
             <p className="empty-message">
@@ -355,6 +370,48 @@ export default async function ResortDetailPage({
           )}
         </section>
       </div>
+
+      <section className="detail-section forecast-section">
+        <div className="section-heading">
+          <h2>Prevision meteorologica</h2>
+          <span className="count-badge">{forecasts.length}</span>
+        </div>
+        {forecasts.length > 0 ? (
+          <div className="forecast-card-list">
+            {forecasts.map((forecast) => (
+              <article className="forecast-card" key={forecast.id}>
+                <h3>{formatForecastDate(forecast.forecast_date)}</h3>
+                <p>{forecast.weather ?? "Sin estado informado"}</p>
+                <dl>
+                  <div>
+                    <dt>Temp.</dt>
+                    <dd>
+                      {compactNumber(forecast.temperature_min_celsius)} /{" "}
+                      {compactNumber(forecast.temperature_max_celsius)} C
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Nieve</dt>
+                    <dd>{compactNumber(forecast.snowfall_cm)} cm</dd>
+                  </div>
+                  <div>
+                    <dt>Lluvia</dt>
+                    <dd>{compactNumber(forecast.precipitation_mm)} mm</dd>
+                  </div>
+                  <div>
+                    <dt>Viento</dt>
+                    <dd>{compactNumber(forecast.wind_speed_max_kmh)} km/h</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-message">
+            No hay prevision meteorologica disponible.
+          </p>
+        )}
+      </section>
 
       <div className="access-grid">
         <section className="detail-section roads-section">

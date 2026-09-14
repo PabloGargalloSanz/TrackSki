@@ -270,8 +270,55 @@ h1 {
 }
 
 .roads-section,
-.incidents-section {
+.incidents-section,
+.forecast-section {
   margin-top: 16px;
+}
+
+.forecast-card-list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.forecast-card {
+  min-width: 132px;
+  padding: 12px;
+  border: 1px solid #e3e9ee;
+  border-radius: 6px;
+}
+
+.forecast-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.forecast-card p {
+  min-height: 42px;
+  margin: 6px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.forecast-card dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.forecast-card dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.forecast-card dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .access-grid {
