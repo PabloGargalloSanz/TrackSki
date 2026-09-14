@@ -434,6 +434,12 @@ h1 {
   background: #dc2626;
 }
 
+.access-map-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .forecast-card-list {
   display: grid;
   grid-template-columns: repeat(7, minmax(132px, 1fr));

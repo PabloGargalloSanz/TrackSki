@@ -208,11 +208,14 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
     [mapData.resort.location.longitude, mapData.resort.location.latitude],
     bounds,
   );
-  const roadsWithLines = mapData.roads.map((accessRoad) => ({
-    accessRoad,
-    lines: geometryLines(accessRoad.road.route),
-    incidents: incidentsForRoad(accessRoad.road.id, mapData.incidents),
-  }));
+  const roadsWithLines = mapData.roads
+    .map((accessRoad) => ({
+      accessRoad,
+      lines: geometryLines(accessRoad.road.route),
+      incidents: incidentsForRoad(accessRoad.road.id, mapData.incidents),
+    }))
+    .filter(({ lines }) => lines.length > 0);
+  const missingGeometryCount = mapData.roads.length - roadsWithLines.length;
   const incidentSummaryItems = incidentSummary(mapData.incidents);
 
   return (
@@ -361,6 +364,13 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
           </div>
         )}
       </div>
+
+      {missingGeometryCount > 0 && (
+        <p className="access-map-note">
+          {roadsWithLines.length} carreteras con geometria,{" "}
+          {missingGeometryCount} pendientes de geometria.
+        </p>
+      )}
     </section>
   );
 }
