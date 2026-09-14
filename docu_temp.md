@@ -204,6 +204,7 @@ GET /health/db
 GET /resorts
 GET /resorts/{id}
 GET /resorts/{id}/summary
+GET /resorts/{id}/map
 GET /resorts/{id}/snow-reports
 GET /resorts/{id}/snow-reports/latest
 GET /resorts/{id}/weather
@@ -233,6 +234,10 @@ GET /resorts/{id}/summary
 `GET /resorts/{id}/summary` es la fuente principal de la ficha de estacion e
 incluye nieve, meteorologia actual, prevision meteorologica, avisos AEMET
 aplicables, carreteras y estado completo de accesos.
+
+`GET /resorts/{id}/map` devuelve los datos necesarios para pintar el mapa de
+accesos de una estacion: estacion, estado global, carreteras con geometria e
+incidencias activas relevantes para esas carreteras y tramos.
 
 ## 7. Carreteras y accesos
 
@@ -707,7 +712,49 @@ WHERE route IS NOT NULL;
 Las geometrias proceden de OpenStreetMap y deben atribuirse como:
 `© OpenStreetMap contributors`.
 
-## 13. Arquitectura de despliegue
+## 13. Mapa basico de accesos
+
+La ficha de estacion incluye un primer mapa basico de accesos. De momento es un
+mapa esquematico SVG pensado para validar datos antes de incorporar un mapa real.
+
+El mapa actual:
+
+- Dibuja la estacion.
+- Dibuja carreteras de acceso con `roads.route`.
+- Colorea carreteras segun incidencias activas:
+  - Verde: abierto.
+  - Amarillo: precaucion.
+  - Naranja: peligro.
+  - Rojo: cerrado.
+- Muestra etiquetas de carretera, por ejemplo `A-23` o `N-330`.
+- Muestra puntos intermedios usando `segment_description`.
+- Muestra incidencias con coordenadas cuando DGT las proporciona.
+- Incluye una leyenda de estados e incidencias agrupadas.
+
+Endpoint usado por el frontend:
+
+```text
+GET /resorts/{id}/map
+```
+
+Limitaciones actuales:
+
+- No hay fondo cartografico real.
+- No hay zoom ni interaccion.
+- No calcula rutas desde un origen.
+- Algunas geometrias pueden representar una carretera mas larga que el tramo
+  exacto usado por la estacion.
+- Si una carretera no tiene `roads.route`, no se puede dibujar.
+
+Siguientes mejoras posibles:
+
+- Sustituir el SVG por Leaflet/OpenStreetMap.
+- Recortar tramos segun `from_km` y `to_km`.
+- Mejorar marcadores de incidencias con detalle.
+- Mostrar pueblos o puntos de paso importantes.
+- Calcular rutas desde origenes habituales.
+
+## 14. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -735,7 +782,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 14. Traefik temporal
+## 15. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -767,7 +814,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 15. Staging y main
+## 16. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -805,7 +852,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 16. Despliegue automatico
+## 17. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -831,7 +878,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 17. Comprobaciones
+## 18. Comprobaciones
 
 Estado:
 
@@ -869,7 +916,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 18. Problemas habituales
+## 19. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -902,7 +949,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 19. Migracion futura a 80/443
+## 20. Migracion futura a 80/443
 
 No realizarla todavia.
 
