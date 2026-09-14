@@ -43,15 +43,41 @@ function boundsFor(points: Point[]): Bounds {
   const maxLon = Math.max(...longitudes);
   const minLat = Math.min(...latitudes);
   const maxLat = Math.max(...latitudes);
-  const lonPadding = Math.max((maxLon - minLon) * 0.12, 0.02);
-  const latPadding = Math.max((maxLat - minLat) * 0.12, 0.02);
+  const lonPadding = Math.max((maxLon - minLon) * 0.2, 0.04);
+  const latPadding = Math.max((maxLat - minLat) * 0.2, 0.04);
 
-  return {
+  const paddedBounds = {
     minLon: minLon - lonPadding,
     maxLon: maxLon + lonPadding,
     minLat: minLat - latPadding,
     maxLat: maxLat + latPadding,
   };
+  const lonRange = paddedBounds.maxLon - paddedBounds.minLon;
+  const latRange = paddedBounds.maxLat - paddedBounds.minLat;
+  const targetRatio = 1.55;
+  const currentRatio = lonRange / latRange;
+
+  if (currentRatio > targetRatio) {
+    const targetLatRange = lonRange / targetRatio;
+    const extraLat = (targetLatRange - latRange) / 2;
+    return {
+      ...paddedBounds,
+      minLat: paddedBounds.minLat - extraLat,
+      maxLat: paddedBounds.maxLat + extraLat,
+    };
+  }
+
+  if (currentRatio < 1 / targetRatio) {
+    const targetLonRange = latRange / targetRatio;
+    const extraLon = (targetLonRange - lonRange) / 2;
+    return {
+      ...paddedBounds,
+      minLon: paddedBounds.minLon - extraLon,
+      maxLon: paddedBounds.maxLon + extraLon,
+    };
+  }
+
+  return paddedBounds;
 }
 
 function projectPoint([longitude, latitude]: Point, bounds: Bounds): Point {
@@ -61,6 +87,14 @@ function projectPoint([longitude, latitude]: Point, bounds: Bounds): Point {
   const y = 100 - ((latitude - bounds.minLat) / height) * 100;
 
   return [x, y];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function labelPosition(point: Point): Point {
+  return [clamp(point[0] + 4, 6, 88), clamp(point[1] - 4, 8, 94)];
 }
 
 function linePath(line: Point[], bounds: Bounds): string {
@@ -208,6 +242,7 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
     [mapData.resort.location.longitude, mapData.resort.location.latitude],
     bounds,
   );
+  const stationLabelPoint = labelPosition(stationPoint);
   const roadsWithLines = mapData.roads
     .map((accessRoad) => ({
       accessRoad,
@@ -327,7 +362,7 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
 
           <g className="access-map__station">
             <circle cx={stationPoint[0]} cy={stationPoint[1]} r="3.4" />
-            <text x={stationPoint[0] + 4} y={stationPoint[1] - 4}>
+            <text x={stationLabelPoint[0]} y={stationLabelPoint[1]}>
               {mapData.resort.name}
             </text>
           </g>
