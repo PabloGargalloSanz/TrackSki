@@ -415,7 +415,6 @@ export default async function ResortDetailPage({
       <section className="detail-section forecast-section">
         <div className="section-heading">
           <h2>Prevision meteorologica</h2>
-          <span className="count-badge">{forecasts.length}</span>
         </div>
         {forecasts.length > 0 ? (
           <div className="forecast-card-list">
