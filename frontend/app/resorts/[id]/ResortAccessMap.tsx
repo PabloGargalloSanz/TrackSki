@@ -72,6 +72,55 @@ function linePath(line: Point[], bounds: Bounds): string {
     .join(" ");
 }
 
+function middlePoint(line: Point[]): Point | null {
+  if (line.length === 0) {
+    return null;
+  }
+
+  return line[Math.floor(line.length / 2)];
+}
+
+function lineLength(line: Point[]): number {
+  return line.reduce((total, point, index) => {
+    if (index === 0) {
+      return total;
+    }
+
+    const previousPoint = line[index - 1];
+    return (
+      total +
+      Math.hypot(point[0] - previousPoint[0], point[1] - previousPoint[1])
+    );
+  }, 0);
+}
+
+function longestLine(lines: Point[][]): Point[] | null {
+  if (lines.length === 0) {
+    return null;
+  }
+
+  return lines.reduce((longest, line) =>
+    lineLength(line) > lineLength(longest) ? line : longest,
+  );
+}
+
+function labelOffset(index: number): Point {
+  const offsets: Point[] = [
+    [0, -3.8],
+    [0, 4.2],
+    [-5.8, 0],
+    [5.8, 0],
+    [-4.5, -3.4],
+    [4.5, 3.4],
+  ];
+
+  return offsets[index % offsets.length];
+}
+
+function labelWidth(label: string): number {
+  return Math.max(11, label.length * 1.75 + 3);
+}
+
 function incidentTone(incidents: RoadIncident[]): string {
   if (
     incidents.some(
@@ -105,6 +154,11 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
     [mapData.resort.location.longitude, mapData.resort.location.latitude],
     bounds,
   );
+  const roadsWithLines = mapData.roads.map((accessRoad) => ({
+    accessRoad,
+    lines: geometryLines(accessRoad.road.route),
+    incidents: incidentsForRoad(accessRoad.road.id, mapData.incidents),
+  }));
 
   return (
     <section className="detail-section map-section">
@@ -116,21 +170,15 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
         <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
           <rect className="access-map__background" width="100" height="100" />
 
-          {mapData.roads.flatMap((accessRoad) => {
-            const roadIncidents = incidentsForRoad(
-              accessRoad.road.id,
-              mapData.incidents,
-            );
-            const tone = incidentTone(roadIncidents);
-
-            return geometryLines(accessRoad.road.route).map((line, index) => (
+          {roadsWithLines.flatMap(({ accessRoad, incidents, lines }) =>
+            lines.map((line, index) => (
               <path
-                className={`access-map__road access-map__road--${tone}`}
+                className={`access-map__road access-map__road--${incidentTone(incidents)}`}
                 d={linePath(line, bounds)}
-                key={`${accessRoad.id}-${index}`}
+                key={`${accessRoad.id}-${index}-path`}
               />
-            ));
-          })}
+            )),
+          )}
 
           {mapData.incidents.map((incident) => {
             if (!incident.location) {
@@ -146,6 +194,34 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
                 key={incident.id}
                 r="2.4"
               />
+            );
+          })}
+
+          {roadsWithLines.map(({ accessRoad, lines }, index) => {
+            const labelPoint = middlePoint(longestLine(lines) ?? []);
+            if (!labelPoint) {
+              return null;
+            }
+
+            const [x, y] = projectPoint(labelPoint, bounds);
+            const [offsetX, offsetY] = labelOffset(index);
+            const width = labelWidth(accessRoad.road.code);
+
+            return (
+              <g
+                className="access-map__road-label"
+                key={`${accessRoad.id}-label`}
+                transform={`translate(${x + offsetX} ${y + offsetY})`}
+              >
+                <rect
+                  x={-(width / 2)}
+                  y="-3.2"
+                  width={width}
+                  height="5.2"
+                  rx="1.4"
+                />
+                <text y="0.8">{accessRoad.road.code}</text>
+              </g>
             );
           })}
 

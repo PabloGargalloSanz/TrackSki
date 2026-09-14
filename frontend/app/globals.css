@@ -318,6 +318,23 @@ h1 {
   stroke: #dc2626;
 }
 
+.access-map__road-label {
+  pointer-events: none;
+}
+
+.access-map__road-label rect {
+  fill: #ffffff;
+  stroke: #cbd7e2;
+  stroke-width: 0.35;
+}
+
+.access-map__road-label text {
+  fill: #16202a;
+  font-size: 2.9px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
 .access-map__incident {
   stroke: #ffffff;
   stroke-width: 0.8;
