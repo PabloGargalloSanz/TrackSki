@@ -30,6 +30,7 @@ from app.schemas.road import (
     RoadIncident,
 )
 from app.schemas.resort import Coordinates, Resort
+from app.schemas.resort_map import ResortMap
 from app.schemas.resort_summary import ResortSummary
 from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_alert import WeatherAlert
@@ -274,6 +275,51 @@ def build_resort_access_status(
     )
 
 
+def build_resort_map(
+    db: Session,
+    resort: dict,
+) -> ResortMap:
+    resort_id = resort["id"]
+    access_roads = get_access_roads_by_resort_id(
+        db,
+        resort_id,
+        include_route=True,
+    )
+    road_ids = [row["road_id"] for row in access_roads]
+    incidents = get_active_road_incidents_for_road_ids(db, road_ids, limit=50)
+
+    affected_incidents = []
+    for incident in incidents:
+        access_candidates = [
+            access_road
+            for access_road in access_roads
+            if access_road["road_id"] == incident["road_id"]
+        ]
+        overlapping_access_roads = [
+            access_road
+            for access_road in access_candidates
+            if km_ranges_overlap(
+                access_road["from_km"],
+                access_road["to_km"],
+                incident["start_km"],
+                incident["end_km"],
+            )
+        ]
+        if overlapping_access_roads:
+            incident_with_access_role = dict(incident)
+            incident_with_access_role["access_role"] = most_relevant_access_role(
+                overlapping_access_roads
+            )
+            affected_incidents.append(incident_with_access_role)
+
+    return ResortMap(
+        resort=serialize_resort(resort),
+        overall_status=overall_access_status(affected_incidents),
+        roads=[serialize_access_road(row) for row in access_roads],
+        incidents=[serialize_road_incident(row) for row in affected_incidents],
+    )
+
+
 @router.get("", response_model=list[Resort])
 def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
     return [serialize_resort(row) for row in get_resorts(db)]
@@ -344,6 +390,21 @@ def retrieve_resort_access_status(
         )
 
     return build_resort_access_status(db, resort_id)
+
+
+@router.get("/{resort_id}/map", response_model=ResortMap)
+def retrieve_resort_map(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> ResortMap:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return build_resort_map(db, resort)
 
 
 @router.get("/{resort_id}/snow-reports/latest", response_model=SnowReport)
