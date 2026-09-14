@@ -11,6 +11,7 @@ class ResortSummaryRouteTest(unittest.TestCase):
     @patch("app.api.routes.resorts.get_active_weather_alerts")
     @patch("app.api.routes.resorts.get_aemet_area_for_resort")
     @patch("app.api.routes.resorts.get_roads_by_resort_id")
+    @patch("app.api.routes.resorts.get_weather_forecasts_by_resort_id")
     @patch("app.api.routes.resorts.get_latest_weather_report_by_resort_id")
     @patch("app.api.routes.resorts.get_latest_snow_report_by_resort_id")
     @patch("app.api.routes.resorts.get_resort_by_id")
@@ -19,6 +20,7 @@ class ResortSummaryRouteTest(unittest.TestCase):
         get_resort_by_id: Mock,
         get_latest_snow_report_by_resort_id: Mock,
         get_latest_weather_report_by_resort_id: Mock,
+        get_weather_forecasts_by_resort_id: Mock,
         get_roads_by_resort_id: Mock,
         get_aemet_area_for_resort: Mock,
         get_active_weather_alerts: Mock,
@@ -38,6 +40,22 @@ class ResortSummaryRouteTest(unittest.TestCase):
         }
         get_latest_snow_report_by_resort_id.return_value = None
         get_latest_weather_report_by_resort_id.return_value = None
+        get_weather_forecasts_by_resort_id.return_value = [
+            {
+                "id": 20,
+                "resort_id": 1,
+                "forecast_date": now.date(),
+                "temperature_min_celsius": -4,
+                "temperature_max_celsius": 2,
+                "precipitation_mm": 1.5,
+                "snowfall_cm": 3,
+                "wind_speed_max_kmh": 22,
+                "weather": "Nevada ligera",
+                "data_source": "open-meteo",
+                "is_verified": False,
+                "reported_at": now,
+            }
+        ]
         get_roads_by_resort_id.return_value = []
         get_aemet_area_for_resort.return_value = "62"
         get_active_weather_alerts.return_value = [
@@ -68,7 +86,9 @@ class ResortSummaryRouteTest(unittest.TestCase):
         summary = retrieve_resort_summary(1, db=db)
 
         self.assertEqual(summary.weather_alerts[0].level, "naranja")
+        self.assertEqual(summary.weather_forecasts[0].weather, "Nevada ligera")
         self.assertEqual(summary.access_status, access_status)
+        get_weather_forecasts_by_resort_id.assert_called_once_with(db, 1)
         get_active_weather_alerts.assert_called_once_with(db, areas=["62"])
         build_resort_access_status.assert_called_once_with(db, 1)
 

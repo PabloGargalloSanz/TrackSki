@@ -2,16 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
+  getResortMap,
   getResortSummary,
   type ResortAccessRoad,
+  type ResortMap,
   type RoadIncident,
 } from "../../../lib/api";
+import { ResortAccessMap } from "./ResortAccessMap";
 
 export const dynamic = "force-dynamic";
 
 type ResortDetailPageProps = {
   params: Promise<{ id: string }>;
 };
+
+const SHOW_ACCESS_MAP = false;
 
 const severityOrder = ["critical", "high", "medium", "low", "unknown"];
 
@@ -32,6 +37,56 @@ const accessStatusLabels: Record<string, string> = {
   unknown: "Sin datos",
 };
 
+const weatherIcons: Record<string, string> = {
+  clear: "/weather/clear.svg",
+  cloud: "/weather/cloud.svg",
+  rain: "/weather/rain.svg",
+  snow: "/weather/snow.svg",
+  storm: "/weather/storm.svg",
+  fog: "/weather/fog.svg",
+};
+
+function weatherIconType(weather: string | null): keyof typeof weatherIcons {
+  const normalizedWeather = weather?.toLocaleLowerCase("es-ES") ?? "";
+
+  if (normalizedWeather.includes("tormenta")) {
+    return "storm";
+  }
+  if (
+    normalizedWeather.includes("nieve") ||
+    normalizedWeather.includes("nevada")
+  ) {
+    return "snow";
+  }
+  if (
+    normalizedWeather.includes("lluvia") ||
+    normalizedWeather.includes("llovizna") ||
+    normalizedWeather.includes("chubasco")
+  ) {
+    return "rain";
+  }
+  if (normalizedWeather.includes("niebla")) {
+    return "fog";
+  }
+  if (
+    normalizedWeather.includes("despejado") &&
+    !normalizedWeather.includes("nuboso")
+  ) {
+    return "clear";
+  }
+
+  return "cloud";
+}
+
+function formatForecastDate(value: string): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Madrid",
+  }).format(new Date(`${value}T12:00:00Z`));
+}
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("es-ES", {
     dateStyle: "medium",
@@ -42,6 +97,10 @@ function formatDate(value: string): string {
 
 function valueOrDash(value: number | string | null, suffix = ""): string {
   return value === null ? "-" : `${value}${suffix}`;
+}
+
+function compactNumber(value: number | null): string {
+  return value === null ? "-" : new Intl.NumberFormat("es-ES").format(value);
 }
 
 function kmRange(incident: RoadIncident): string {
@@ -157,9 +216,17 @@ export default async function ResortDetailPage({
   }
 
   let summary;
+  let mapData: ResortMap | null = null;
 
   try {
-    summary = await getResortSummary(resortId);
+    if (SHOW_ACCESS_MAP) {
+      [summary, mapData] = await Promise.all([
+        getResortSummary(resortId),
+        getResortMap(resortId),
+      ]);
+    } else {
+      summary = await getResortSummary(resortId);
+    }
   } catch (error) {
     console.error(`No se pudo cargar el resumen de la estacion ${id}:`, error);
 
@@ -184,6 +251,7 @@ export default async function ResortDetailPage({
     resort,
     latest_snow_report: snow,
     latest_weather_report: weather,
+    weather_forecasts: forecasts,
     weather_alerts: alerts,
     access_status: accessStatus,
   } = summary;
@@ -347,6 +415,7 @@ export default async function ResortDetailPage({
                   </p>
                 )}
               </div>
+
             </>
           ) : (
             <p className="empty-message">
@@ -355,6 +424,56 @@ export default async function ResortDetailPage({
           )}
         </section>
       </div>
+
+      <section className="detail-section forecast-section">
+        <div className="section-heading">
+          <h2>Prevision meteorologica</h2>
+        </div>
+        {forecasts.length > 0 ? (
+          <div className="forecast-card-list">
+            {forecasts.map((forecast) => (
+              <article className="forecast-card" key={forecast.id}>
+                <div className="forecast-card__header">
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    src={weatherIcons[weatherIconType(forecast.weather)]}
+                  />
+                  <h3>{formatForecastDate(forecast.forecast_date)}</h3>
+                </div>
+                <p>{forecast.weather ?? "Sin estado informado"}</p>
+                <dl>
+                  <div>
+                    <dt>Temp.</dt>
+                    <dd>
+                      {compactNumber(forecast.temperature_min_celsius)} /{" "}
+                      {compactNumber(forecast.temperature_max_celsius)} C
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Nieve</dt>
+                    <dd>{compactNumber(forecast.snowfall_cm)} cm</dd>
+                  </div>
+                  <div>
+                    <dt>Lluvia</dt>
+                    <dd>{compactNumber(forecast.precipitation_mm)} mm</dd>
+                  </div>
+                  <div>
+                    <dt>Viento</dt>
+                    <dd>{compactNumber(forecast.wind_speed_max_kmh)} km/h</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-message">
+            No hay prevision meteorologica disponible.
+          </p>
+        )}
+      </section>
+
+      {SHOW_ACCESS_MAP && mapData && <ResortAccessMap mapData={mapData} />}
 
       <div className="access-grid">
         <section className="detail-section roads-section">

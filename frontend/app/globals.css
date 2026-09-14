@@ -270,8 +270,232 @@ h1 {
 }
 
 .roads-section,
-.incidents-section {
+.incidents-section,
+.forecast-section,
+.map-section {
   margin-top: 16px;
+}
+
+.access-map {
+  height: 360px;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #d9e2ea;
+  border-radius: 8px;
+  background: #eef5f2;
+}
+
+.access-map svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.access-map__background {
+  fill: #eef5f2;
+}
+
+.access-map__road {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.3;
+}
+
+.access-map__road--open {
+  stroke: #16a34a;
+}
+
+.access-map__road--warning {
+  stroke: #f59e0b;
+}
+
+.access-map__road--danger {
+  stroke: #ea580c;
+}
+
+.access-map__road--closed {
+  stroke: #dc2626;
+}
+
+.access-map__road-label {
+  pointer-events: none;
+}
+
+.access-map__road-label rect {
+  fill: #ffffff;
+  stroke: #cbd7e2;
+  stroke-width: 0.35;
+}
+
+.access-map__road-label text {
+  fill: #16202a;
+  font-size: 2.9px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.access-map__incident {
+  stroke: #ffffff;
+  stroke-width: 0.8;
+}
+
+.access-map__incident--critical {
+  fill: #991b1b;
+}
+
+.access-map__incident--high {
+  fill: #ea580c;
+}
+
+.access-map__incident--medium {
+  fill: #d97706;
+}
+
+.access-map__incident--low,
+.access-map__incident--unknown {
+  fill: #0f766e;
+}
+
+.access-map__access-point {
+  fill: #ffffff;
+  stroke: #334155;
+  stroke-width: 0.7;
+}
+
+.access-map__access-label {
+  fill: #334155;
+  font-size: 2.7px;
+  font-weight: 700;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: #ffffff;
+  stroke-width: 0.85;
+}
+
+.access-map__station circle {
+  fill: #0f766e;
+  stroke: #ffffff;
+  stroke-width: 1;
+}
+
+.access-map__station text {
+  fill: #16202a;
+  font-size: 4px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #ffffff;
+  stroke-width: 1;
+}
+
+.access-map-legend {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.access-map-legend__status,
+.access-map-legend__incidents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.access-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 22px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.legend-line--open {
+  background: #16a34a;
+}
+
+.legend-line--warning {
+  background: #f59e0b;
+}
+
+.legend-line--danger {
+  background: #ea580c;
+}
+
+.legend-line--closed {
+  background: #dc2626;
+}
+
+.access-map-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.forecast-card-list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(132px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.forecast-card {
+  min-width: 132px;
+  padding: 12px;
+  border: 1px solid #e3e9ee;
+  border-radius: 6px;
+}
+
+.forecast-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.forecast-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.forecast-card__header img {
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
+.forecast-card p {
+  min-height: 42px;
+  margin: 6px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.forecast-card dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.forecast-card dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.forecast-card dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .access-grid {

@@ -293,6 +293,34 @@ CREATE TABLE IF NOT EXISTS weather_reports (
 );
 
 
+CREATE TABLE IF NOT EXISTS weather_forecasts (
+    id SERIAL PRIMARY KEY,
+    resort_id INT NOT NULL REFERENCES ski_resorts(id) ON DELETE CASCADE,
+    forecast_date DATE NOT NULL,
+    temperature_min_celsius DECIMAL(4,1),
+    temperature_max_celsius DECIMAL(4,1),
+    precipitation_mm DECIMAL(6,2),
+    snowfall_cm DECIMAL(6,2),
+    wind_speed_max_kmh DECIMAL(5,1),
+    weather VARCHAR(80),
+    data_source VARCHAR(100) NOT NULL DEFAULT 'manual',
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    reported_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_weather_forecasts_resort_source_date UNIQUE (
+        resort_id,
+        data_source,
+        forecast_date
+    ),
+
+    CONSTRAINT chk_weather_forecasts_temperature CHECK (
+        temperature_min_celsius IS NULL
+        OR temperature_max_celsius IS NULL
+        OR temperature_min_celsius <= temperature_max_celsius
+    )
+);
+
+
 CREATE TABLE IF NOT EXISTS weather_alerts (
     id SERIAL PRIMARY KEY,
     identifier VARCHAR(255) NOT NULL,
@@ -402,6 +430,9 @@ ON snow_reports(resort_id, reported_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_weather_reports_resort_reported_at
 ON weather_reports(resort_id, reported_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_weather_forecasts_resort_date
+ON weather_forecasts(resort_id, forecast_date);
 
 CREATE INDEX IF NOT EXISTS idx_weather_alerts_expires
 ON weather_alerts(expires);

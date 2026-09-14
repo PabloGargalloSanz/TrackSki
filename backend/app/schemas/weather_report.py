@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
@@ -12,6 +12,21 @@ class WeatherReport(BaseModel):
     wind_direction: str | None
     precipitation_mm: Decimal | None
     visibility_m: int | None
+    weather: str | None
+    data_source: str
+    is_verified: bool
+    reported_at: datetime
+
+
+class WeatherForecast(BaseModel):
+    id: int
+    resort_id: int
+    forecast_date: date
+    temperature_min_celsius: Decimal | None
+    temperature_max_celsius: Decimal | None
+    precipitation_mm: Decimal | None
+    snowfall_cm: Decimal | None
+    wind_speed_max_kmh: Decimal | None
     weather: str | None
     data_source: str
     is_verified: bool

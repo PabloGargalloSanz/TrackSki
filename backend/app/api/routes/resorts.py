@@ -19,6 +19,7 @@ from app.repositories.weather_reports import (
     get_latest_weather_report_by_resort_id,
     get_weather_reports_by_resort_id,
 )
+from app.repositories.weather_forecasts import get_weather_forecasts_by_resort_id
 from app.repositories.weather_alerts import get_active_weather_alerts
 from app.schemas.road import (
     ResortAccessRoad,
@@ -29,10 +30,11 @@ from app.schemas.road import (
     RoadIncident,
 )
 from app.schemas.resort import Coordinates, Resort
+from app.schemas.resort_map import ResortMap
 from app.schemas.resort_summary import ResortSummary
 from app.schemas.snow_report import SnowReport, TrailStatus
 from app.schemas.weather_alert import WeatherAlert
-from app.schemas.weather_report import WeatherReport
+from app.schemas.weather_report import WeatherForecast, WeatherReport
 from app.services.road_access import (
     compact_roadwork_incidents,
     km_ranges_overlap,
@@ -103,6 +105,23 @@ def serialize_weather_report(row: dict) -> WeatherReport:
         wind_direction=row["wind_direction"],
         precipitation_mm=row["precipitation_mm"],
         visibility_m=row["visibility_m"],
+        weather=row["weather"],
+        data_source=row["data_source"],
+        is_verified=row["is_verified"],
+        reported_at=row["reported_at"],
+    )
+
+
+def serialize_weather_forecast(row: dict) -> WeatherForecast:
+    return WeatherForecast(
+        id=row["id"],
+        resort_id=row["resort_id"],
+        forecast_date=row["forecast_date"],
+        temperature_min_celsius=row["temperature_min_celsius"],
+        temperature_max_celsius=row["temperature_max_celsius"],
+        precipitation_mm=row["precipitation_mm"],
+        snowfall_cm=row["snowfall_cm"],
+        wind_speed_max_kmh=row["wind_speed_max_kmh"],
         weather=row["weather"],
         data_source=row["data_source"],
         is_verified=row["is_verified"],
@@ -256,6 +275,51 @@ def build_resort_access_status(
     )
 
 
+def build_resort_map(
+    db: Session,
+    resort: dict,
+) -> ResortMap:
+    resort_id = resort["id"]
+    access_roads = get_access_roads_by_resort_id(
+        db,
+        resort_id,
+        include_route=True,
+    )
+    road_ids = [row["road_id"] for row in access_roads]
+    incidents = get_active_road_incidents_for_road_ids(db, road_ids, limit=50)
+
+    affected_incidents = []
+    for incident in incidents:
+        access_candidates = [
+            access_road
+            for access_road in access_roads
+            if access_road["road_id"] == incident["road_id"]
+        ]
+        overlapping_access_roads = [
+            access_road
+            for access_road in access_candidates
+            if km_ranges_overlap(
+                access_road["from_km"],
+                access_road["to_km"],
+                incident["start_km"],
+                incident["end_km"],
+            )
+        ]
+        if overlapping_access_roads:
+            incident_with_access_role = dict(incident)
+            incident_with_access_role["access_role"] = most_relevant_access_role(
+                overlapping_access_roads
+            )
+            affected_incidents.append(incident_with_access_role)
+
+    return ResortMap(
+        resort=serialize_resort(resort),
+        overall_status=overall_access_status(affected_incidents),
+        roads=[serialize_access_road(row) for row in access_roads],
+        incidents=[serialize_road_incident(row) for row in affected_incidents],
+    )
+
+
 @router.get("", response_model=list[Resort])
 def list_resorts(db: Session = Depends(get_db)) -> list[Resort]:
     return [serialize_resort(row) for row in get_resorts(db)]
@@ -287,6 +351,7 @@ def retrieve_resort_summary(
 
     snow_report = get_latest_snow_report_by_resort_id(db, resort_id)
     weather_report = get_latest_weather_report_by_resort_id(db, resort_id)
+    weather_forecasts = get_weather_forecasts_by_resort_id(db, resort_id)
     roads = get_roads_by_resort_id(db, resort_id, include_route=False)
     aemet_area = get_aemet_area_for_resort(resort)
     weather_alerts = (
@@ -303,6 +368,9 @@ def retrieve_resort_summary(
         latest_weather_report=(
             serialize_weather_report(weather_report) if weather_report else None
         ),
+        weather_forecasts=[
+            serialize_weather_forecast(row) for row in weather_forecasts
+        ],
         roads=[serialize_road(row) for row in roads],
         weather_alerts=[serialize_weather_alert(row) for row in weather_alerts],
         access_status=build_resort_access_status(db, resort_id),
@@ -322,6 +390,21 @@ def retrieve_resort_access_status(
         )
 
     return build_resort_access_status(db, resort_id)
+
+
+@router.get("/{resort_id}/map", response_model=ResortMap)
+def retrieve_resort_map(
+    resort_id: int,
+    db: Session = Depends(get_db),
+) -> ResortMap:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return build_resort_map(db, resort)
 
 
 @router.get("/{resort_id}/snow-reports/latest", response_model=SnowReport)
@@ -403,6 +486,25 @@ def list_weather_reports(
     return [
         serialize_weather_report(row)
         for row in get_weather_reports_by_resort_id(db, resort_id, limit)
+    ]
+
+
+@router.get("/{resort_id}/weather/forecast", response_model=list[WeatherForecast])
+def list_weather_forecasts(
+    resort_id: int,
+    limit: ReportLimit = 7,
+    db: Session = Depends(get_db),
+) -> list[WeatherForecast]:
+    resort = get_resort_by_id(db, resort_id)
+    if not resort:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Resort not found",
+        )
+
+    return [
+        serialize_weather_forecast(row)
+        for row in get_weather_forecasts_by_resort_id(db, resort_id, limit)
     ]
 
 

@@ -52,10 +52,32 @@ export type WeatherReport = {
   reported_at: string;
 };
 
+export type WeatherForecast = {
+  id: number;
+  resort_id: number;
+  forecast_date: string;
+  temperature_min_celsius: number | null;
+  temperature_max_celsius: number | null;
+  precipitation_mm: number | null;
+  snowfall_cm: number | null;
+  wind_speed_max_kmh: number | null;
+  weather: string | null;
+  data_source: string;
+  is_verified: boolean;
+  reported_at: string;
+};
+
 export type LineString = {
   type: "LineString";
   coordinates: [number, number][];
 };
+
+export type MultiLineString = {
+  type: "MultiLineString";
+  coordinates: [number, number][][];
+};
+
+export type RoadGeometry = LineString | MultiLineString;
 
 export type Point = {
   type: "Point";
@@ -66,7 +88,7 @@ export type Road = {
   id: number;
   code: string;
   name: string | null;
-  route: LineString | null;
+  route: RoadGeometry | null;
   latest_condition: {
     status: string;
     severity: string;
@@ -100,7 +122,7 @@ export type RoadIncident = {
   end_km: number | null;
   direction: string | null;
   location: Point | null;
-  affected_route: LineString | null;
+  affected_route: RoadGeometry | null;
   starts_at: string | null;
   ends_at: string | null;
   reported_at: string | null;
@@ -145,9 +167,17 @@ export type ResortSummary = {
   resort: Resort;
   latest_snow_report: SnowReport | null;
   latest_weather_report: WeatherReport | null;
+  weather_forecasts: WeatherForecast[];
   roads: Road[];
   weather_alerts: WeatherAlert[];
   access_status: ResortAccessStatus;
+};
+
+export type ResortMap = {
+  resort: Resort;
+  overall_status: string;
+  roads: ResortAccessRoad[];
+  incidents: RoadIncident[];
 };
 
 const internalApiUrl =
@@ -181,4 +211,22 @@ export async function getResortSummary(
   }
 
   return response.json() as Promise<ResortSummary>;
+}
+
+export async function getResortMap(
+  resortId: number,
+): Promise<ResortMap | null> {
+  const response = await fetch(`${internalApiUrl}/resorts/${resortId}/map`, {
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`API request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<ResortMap>;
 }
