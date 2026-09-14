@@ -52,6 +52,21 @@ export type WeatherReport = {
   reported_at: string;
 };
 
+export type WeatherForecast = {
+  id: number;
+  resort_id: number;
+  forecast_date: string;
+  temperature_min_celsius: number | null;
+  temperature_max_celsius: number | null;
+  precipitation_mm: number | null;
+  snowfall_cm: number | null;
+  wind_speed_max_kmh: number | null;
+  weather: string | null;
+  data_source: string;
+  is_verified: boolean;
+  reported_at: string;
+};
+
 export type LineString = {
   type: "LineString";
   coordinates: [number, number][];
@@ -145,6 +160,7 @@ export type ResortSummary = {
   resort: Resort;
   latest_snow_report: SnowReport | null;
   latest_weather_report: WeatherReport | null;
+  weather_forecasts: WeatherForecast[];
   roads: Road[];
   weather_alerts: WeatherAlert[];
   access_status: ResortAccessStatus;
