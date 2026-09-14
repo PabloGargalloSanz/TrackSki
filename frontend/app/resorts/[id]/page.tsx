@@ -5,6 +5,7 @@ import {
   getResortMap,
   getResortSummary,
   type ResortAccessRoad,
+  type ResortMap,
   type RoadIncident,
 } from "../../../lib/api";
 import { ResortAccessMap } from "./ResortAccessMap";
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 type ResortDetailPageProps = {
   params: Promise<{ id: string }>;
 };
+
+const SHOW_ACCESS_MAP = false;
 
 const severityOrder = ["critical", "high", "medium", "low", "unknown"];
 
@@ -213,13 +216,17 @@ export default async function ResortDetailPage({
   }
 
   let summary;
-  let mapData;
+  let mapData: ResortMap | null = null;
 
   try {
-    [summary, mapData] = await Promise.all([
-      getResortSummary(resortId),
-      getResortMap(resortId),
-    ]);
+    if (SHOW_ACCESS_MAP) {
+      [summary, mapData] = await Promise.all([
+        getResortSummary(resortId),
+        getResortMap(resortId),
+      ]);
+    } else {
+      summary = await getResortSummary(resortId);
+    }
   } catch (error) {
     console.error(`No se pudo cargar el resumen de la estacion ${id}:`, error);
 
@@ -466,7 +473,7 @@ export default async function ResortDetailPage({
         )}
       </section>
 
-      {mapData && <ResortAccessMap mapData={mapData} />}
+      {SHOW_ACCESS_MAP && mapData && <ResortAccessMap mapData={mapData} />}
 
       <div className="access-grid">
         <section className="detail-section roads-section">
