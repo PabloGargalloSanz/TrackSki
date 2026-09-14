@@ -731,6 +731,10 @@ El mapa actual:
 - Muestra incidencias con coordenadas cuando DGT las proporciona.
 - Incluye una leyenda de estados e incidencias agrupadas.
 
+El mapa no duplica el listado completo de incidencias. El detalle de cada
+incidencia se muestra en el bloque `Incidencias de carretera` de la ficha de
+estacion.
+
 Endpoint usado por el frontend:
 
 ```text
@@ -750,7 +754,7 @@ Siguientes mejoras posibles:
 
 - Sustituir el SVG por Leaflet/OpenStreetMap.
 - Recortar tramos segun `from_km` y `to_km`.
-- Mejorar marcadores de incidencias con detalle.
+- Mejorar marcadores de incidencias con tooltips o popups.
 - Mostrar pueblos o puntos de paso importantes.
 - Calcular rutas desde origenes habituales.
 
