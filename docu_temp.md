@@ -208,6 +208,7 @@ GET /resorts/{id}/snow-reports
 GET /resorts/{id}/snow-reports/latest
 GET /resorts/{id}/weather
 GET /resorts/{id}/weather/latest
+GET /resorts/{id}/weather/forecast
 GET /resorts/{id}/roads
 GET /resorts/{id}/access-status
 GET /roads
@@ -230,8 +231,8 @@ GET /resorts/{id}/summary
 ```
 
 `GET /resorts/{id}/summary` es la fuente principal de la ficha de estacion e
-incluye nieve, meteorologia, avisos AEMET aplicables, carreteras y estado
-completo de accesos.
+incluye nieve, meteorologia actual, prevision meteorologica, avisos AEMET
+aplicables, carreteras y estado completo de accesos.
 
 ## 7. Carreteras y accesos
 
@@ -313,10 +314,21 @@ posterior junto con la ejecucion periodica del importador.
 
 Open-Meteo se consulta usando las coordenadas de cada estacion. Se normalizan:
 
+Condiciones actuales:
+
 - Temperatura.
 - Precipitacion.
 - Velocidad y direccion del viento.
 - Visibilidad.
+- Codigo meteorologico WMO.
+
+Prevision diaria:
+
+- Fecha de prevision.
+- Temperatura minima y maxima.
+- Precipitacion acumulada.
+- Nieve acumulada.
+- Viento maximo.
 - Codigo meteorologico WMO.
 
 Los registros se guardan con:
@@ -339,6 +351,24 @@ Importar una estacion:
 python -m app.commands.ingest_weather --resort-id 1
 ```
 
+Importar prevision de todas las estaciones:
+
+```bash
+python -m app.commands.ingest_forecast
+```
+
+Importar prevision de una estacion:
+
+```bash
+python -m app.commands.ingest_forecast --resort-id 1
+```
+
+Importar un numero concreto de dias:
+
+```bash
+python -m app.commands.ingest_forecast --days 5
+```
+
 Dentro del backend de staging:
 
 ```bash
@@ -346,8 +376,41 @@ docker compose --env-file .env -p trackski_staging exec backend \
   python -m app.commands.ingest_weather
 ```
 
-La insercion evita duplicados para la misma estacion, fuente y fecha de
-observacion. El comando no esta programado todavia.
+Consultar prevision por API:
+
+```text
+GET /resorts/1/weather/forecast
+GET /resorts/1/summary
+```
+
+Consultar previsiones guardadas en PostgreSQL:
+
+```sql
+SELECT
+    resort_id,
+    forecast_date,
+    weather,
+    temperature_min_celsius,
+    temperature_max_celsius,
+    precipitation_mm,
+    snowfall_cm,
+    wind_speed_max_kmh,
+    reported_at
+FROM weather_forecasts
+ORDER BY resort_id, forecast_date;
+```
+
+La insercion de meteorologia actual evita duplicados para la misma estacion,
+fuente y fecha de observacion.
+
+La prevision usa upsert por estacion, fuente y fecha de prevision:
+
+```text
+resort_id + data_source + forecast_date
+```
+
+Por tanto, si se ejecuta todos los dias, actualiza la prevision existente para
+esa fecha y no crea varias previsiones duplicadas del mismo dia.
 
 Ejecutar las pruebas del proveedor:
 
@@ -414,6 +477,7 @@ Tambien se puede ejecutar por partes:
 
 ```bash
 python -m app.jobs.refresh_real_data --weather
+python -m app.jobs.refresh_real_data --forecast
 python -m app.jobs.refresh_real_data --alerts
 python -m app.jobs.refresh_real_data --alerts --area 62 --area 61
 python -m app.jobs.refresh_real_data --roads
@@ -441,7 +505,8 @@ python -m app.jobs.refresh_real_data --weather
 El agrupador no duplica la logica de ingesta: reutiliza los comandos y jobs ya
 existentes:
 
-- Open-Meteo: `app.commands.ingest_weather`
+- Open-Meteo actual: `app.commands.ingest_weather`
+- Open-Meteo prevision: `app.commands.ingest_forecast`
 - AEMET: `app.commands.ingest_alerts`
 - DGT DATEX2: `app.jobs.import_dgt_datex2_incidents`
 
@@ -462,20 +527,24 @@ Comandos existentes que siguen funcionando:
 ```bash
 python -m app.commands.ingest_weather
 python -m app.commands.ingest_weather --resort-id 1
+python -m app.commands.ingest_forecast
+python -m app.commands.ingest_forecast --resort-id 1
 python -m app.commands.ingest_alerts --area 62
 python -m app.jobs.import_dgt_datex2_incidents
 ```
 
 Comportamiento por fuente:
 
-- Open-Meteo hace una peticion por estacion porque necesita coordenadas.
+- Open-Meteo actual y prevision hacen una peticion por estacion porque necesitan
+  coordenadas.
 - AEMET hace una peticion por area AEMET unica, no por estacion.
 - DGT hace una peticion global al XML DATEX2 y filtra localmente por carreteras
   configuradas en `roads`.
 
 Datos actualizados:
 
-- `weather_reports` con Open-Meteo.
+- `weather_reports` con Open-Meteo actual.
+- `weather_forecasts` con Open-Meteo prevision.
 - `weather_alerts` con AEMET.
 - `road_incidents` y `road_conditions` con DGT DATEX2.
 
@@ -498,6 +567,7 @@ Servicios disponibles:
 ```text
 data_job_roads
 data_job_weather
+data_job_forecast
 data_job_alerts
 ```
 
@@ -506,6 +576,7 @@ Ejecutar manualmente:
 ```bash
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 ```
 
@@ -518,10 +589,12 @@ Orden recomendado:
 ```text
 1. DGT DATEX2 nada mas desplegar o al arrancar el servidor.
 2. Open-Meteo nada mas desplegar o al arrancar el servidor.
-3. AEMET nada mas desplegar o al arrancar el servidor.
-4. DGT DATEX2 cada 15 min.
-5. Open-Meteo cada 30 min.
-6. AEMET cada 30 min.
+3. Prevision Open-Meteo nada mas desplegar o al arrancar el servidor.
+4. AEMET nada mas desplegar o al arrancar el servidor.
+5. DGT DATEX2 cada 15 min.
+6. Open-Meteo actual cada 30 min.
+7. AEMET cada 30 min.
+8. Prevision Open-Meteo cada 6 h.
 ```
 
 Ejemplo de cron en staging:
@@ -530,10 +603,11 @@ Ejemplo de cron en staging:
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-@reboot cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+@reboot cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 */15 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
 */30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
 */30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+0 */6 * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast
 ```
 
 Probar una ejecucion y ver el resultado en consola:
