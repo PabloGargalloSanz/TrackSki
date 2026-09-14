@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
+  getResortMap,
   getResortSummary,
   type ResortAccessRoad,
   type RoadIncident,
 } from "../../../lib/api";
+import { ResortAccessMap } from "./ResortAccessMap";
 
 export const dynamic = "force-dynamic";
 
@@ -211,9 +213,13 @@ export default async function ResortDetailPage({
   }
 
   let summary;
+  let mapData;
 
   try {
-    summary = await getResortSummary(resortId);
+    [summary, mapData] = await Promise.all([
+      getResortSummary(resortId),
+      getResortMap(resortId),
+    ]);
   } catch (error) {
     console.error(`No se pudo cargar el resumen de la estacion ${id}:`, error);
 
@@ -459,6 +465,8 @@ export default async function ResortDetailPage({
           </p>
         )}
       </section>
+
+      {mapData && <ResortAccessMap mapData={mapData} />}
 
       <div className="access-grid">
         <section className="detail-section roads-section">
