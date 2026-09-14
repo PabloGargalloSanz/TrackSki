@@ -357,6 +357,22 @@ h1 {
   fill: #0f766e;
 }
 
+.access-map__access-point {
+  fill: #ffffff;
+  stroke: #334155;
+  stroke-width: 0.7;
+}
+
+.access-map__access-label {
+  fill: #334155;
+  font-size: 2.7px;
+  font-weight: 700;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: #ffffff;
+  stroke-width: 0.85;
+}
+
 .access-map__station circle {
   fill: #0f766e;
   stroke: #ffffff;

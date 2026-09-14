@@ -121,6 +121,27 @@ function labelWidth(label: string): number {
   return Math.max(11, label.length * 1.75 + 3);
 }
 
+function accessPointLabel(description: string | null, fallback: string): string {
+  const rawLabel = description ?? fallback;
+  const normalizedLabel = rawLabel
+    .replace(/\.$/, "")
+    .replace(/^Tramo\s+(de\s+)?/i, "")
+    .replace(/^Acceso\s+(por\s+)?/i, "")
+    .replace(/^Subida\s+final\s+/i, "")
+    .replace(/^Entrada\s+final\s+a\s+/i, "")
+    .replace(/^final\s+a\s+/i, "")
+    .replace(/^principal\s+en\s+/i, "")
+    .replace(/^de\s+aproximacion\s+hacia\s+/i, "")
+    .replace(/^de\s+aproximación\s+hacia\s+/i, "")
+    .replace(/\s+hacia\s+/i, " - ")
+    .replace(/:\s*/g, ": ")
+    .trim();
+
+  return normalizedLabel.length > 34
+    ? `${normalizedLabel.slice(0, 31)}...`
+    : normalizedLabel;
+}
+
 function incidentTone(incidents: RoadIncident[]): string {
   if (
     incidents.some(
@@ -223,6 +244,48 @@ export function ResortAccessMap({ mapData }: { mapData: ResortMap }) {
                 <text y="0.8">{accessRoad.road.code}</text>
               </g>
             );
+          })}
+
+          {roadsWithLines.flatMap(({ accessRoad, lines }, index) => {
+            const line = longestLine(lines);
+            if (!line || line.length < 2) {
+              return [];
+            }
+
+            const start = projectPoint(line[0], bounds);
+            const end = projectPoint(line[line.length - 1], bounds);
+            const showLabel = index % 2 === 0;
+            const label = accessPointLabel(
+              accessRoad.segment_description,
+              accessRoad.road.name ?? accessRoad.road.code,
+            );
+
+            return [
+              <circle
+                className="access-map__access-point"
+                cx={start[0]}
+                cy={start[1]}
+                key={`${accessRoad.id}-start`}
+                r="1.6"
+              />,
+              <circle
+                className="access-map__access-point"
+                cx={end[0]}
+                cy={end[1]}
+                key={`${accessRoad.id}-end`}
+                r="1.6"
+              />,
+              showLabel ? (
+                <text
+                  className="access-map__access-label"
+                  key={`${accessRoad.id}-access-label`}
+                  x={end[0] + 2.4}
+                  y={end[1] + 2.4}
+                >
+                  {label}
+                </text>
+              ) : null,
+            ];
           })}
 
           <g className="access-map__station">
