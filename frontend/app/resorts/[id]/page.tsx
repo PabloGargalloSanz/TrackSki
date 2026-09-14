@@ -32,6 +32,47 @@ const accessStatusLabels: Record<string, string> = {
   unknown: "Sin datos",
 };
 
+const weatherIcons: Record<string, string> = {
+  clear: "/weather/clear.svg",
+  cloud: "/weather/cloud.svg",
+  rain: "/weather/rain.svg",
+  snow: "/weather/snow.svg",
+  storm: "/weather/storm.svg",
+  fog: "/weather/fog.svg",
+};
+
+function weatherIconType(weather: string | null): keyof typeof weatherIcons {
+  const normalizedWeather = weather?.toLocaleLowerCase("es-ES") ?? "";
+
+  if (normalizedWeather.includes("tormenta")) {
+    return "storm";
+  }
+  if (
+    normalizedWeather.includes("nieve") ||
+    normalizedWeather.includes("nevada")
+  ) {
+    return "snow";
+  }
+  if (
+    normalizedWeather.includes("lluvia") ||
+    normalizedWeather.includes("llovizna") ||
+    normalizedWeather.includes("chubasco")
+  ) {
+    return "rain";
+  }
+  if (normalizedWeather.includes("niebla")) {
+    return "fog";
+  }
+  if (
+    normalizedWeather.includes("despejado") &&
+    !normalizedWeather.includes("nuboso")
+  ) {
+    return "clear";
+  }
+
+  return "cloud";
+}
+
 function formatForecastDate(value: string): string {
   return new Intl.DateTimeFormat("es-ES", {
     weekday: "short",
@@ -380,7 +421,14 @@ export default async function ResortDetailPage({
           <div className="forecast-card-list">
             {forecasts.map((forecast) => (
               <article className="forecast-card" key={forecast.id}>
-                <h3>{formatForecastDate(forecast.forecast_date)}</h3>
+                <div className="forecast-card__header">
+                  <img
+                    alt=""
+                    aria-hidden="true"
+                    src={weatherIcons[weatherIconType(forecast.weather)]}
+                  />
+                  <h3>{formatForecastDate(forecast.forecast_date)}</h3>
+                </div>
                 <p>{forecast.weather ?? "Sin estado informado"}</p>
                 <dl>
                   <div>

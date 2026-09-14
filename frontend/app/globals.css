@@ -296,6 +296,18 @@ h1 {
   font-size: 15px;
 }
 
+.forecast-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.forecast-card__header img {
+  flex: none;
+  width: 34px;
+  height: 34px;
+}
+
 .forecast-card p {
   min-height: 42px;
   margin: 6px 0 12px;

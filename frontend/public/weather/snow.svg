@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nieve">
+  <path fill="#cbd5e1" d="M17 36h31a10 10 0 0 0 1-20 16 16 0 0 0-30-4A12 12 0 0 0 17 36Z"/>
+  <g stroke="#38bdf8" stroke-linecap="round" stroke-width="3">
+    <path d="M24 45v12"/>
+    <path d="M18 51h12"/>
+    <path d="m20 47 8 8"/>
+    <path d="m28 47-8 8"/>
+    <path d="M43 45v12"/>
+    <path d="M37 51h12"/>
+    <path d="m39 47 8 8"/>
+    <path d="m47 47-8 8"/>
+  </g>
+</svg>
