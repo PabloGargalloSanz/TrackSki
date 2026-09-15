@@ -18,6 +18,7 @@ Actualmente existen:
 - Ingesta meteorologica manual desde Open-Meteo.
 - Lectura de avisos oficiales AEMET.
 - Modelo de carreteras, accesos por estacion, incidencias y alternativas.
+- Estructura inicial para scrapers de partes de nieve.
 - Despliegue automatico de `staging` y `main`.
 
 Los datos de nieve, carreteras y parte de la meteorologia incluidos en el seed
@@ -37,6 +38,9 @@ backend/
     schemas/             Modelos de respuesta
     services/            Logica de dominio
       services/weather/    Proveedores meteorologicos
+      services/snow/       Modelos internos de partes de nieve
+    scrapers/
+      scrapers/snow/       Scrapers por fuente de partes de nieve
   db/init/               Esquema y seed inicial
   tests/                 Pruebas del backend
 frontend/
@@ -468,7 +472,92 @@ Ambas fuentes deben conservarse por separado.
 La ingesta automatica de AEMET tambien queda pendiente para una fase posterior,
 junto con el resto de jobs.
 
-## 10. Jobs manuales de datos reales
+## 10. Partes de nieve
+
+Los partes de nieve se estan preparando mediante scrapers por fuente o empresa,
+no por estacion aislada. La idea es reutilizar la misma logica cuando varias
+estaciones comparten web, clases HTML o estructura de datos.
+
+Estructura actual:
+
+```text
+app/services/snow/       Modelo interno comun
+app/scrapers/snow/       Scrapers por fuente
+```
+
+Fuentes previstas:
+
+- Aramon: Cerler, Formigal/Panticosa, Valdelinares/Javalambre.
+- Astun/Candanchu: fuente conjunta.
+- Baqueira.
+- Grandvalira.
+
+De momento existe un primer scraper para Aramon. El flujo actual permite:
+
+- Depurar que extrae el scraper sin guardar en DB.
+- Guardar partes de nieve en `snow_reports`.
+- Ejecutarlo desde `refresh_real_data --snow`.
+- Ejecutarlo como job Docker one-shot.
+
+Ver que extrae el scraper de Aramon sin guardar nada:
+
+```bash
+cd backend
+python -m app.commands.debug_snow_scraper --provider aramon
+```
+
+Probar una URL concreta:
+
+```bash
+python -m app.commands.debug_snow_scraper \
+  --provider aramon \
+  --name Cerler \
+  --url "https://www.cerler.com/partes/parteNieve?prevision=0"
+```
+
+Guardar el parte de nieve configurado:
+
+```bash
+python -m app.commands.ingest_snow_reports
+```
+
+Guardar una estacion concreta indicando nombre y URL:
+
+```bash
+python -m app.commands.ingest_snow_reports \
+  --resort-name Cerler \
+  --url "https://www.cerler.com/partes/parteNieve?prevision=0"
+```
+
+Consultar ultimos partes guardados:
+
+```sql
+SELECT
+    resort_id,
+    open_lifts,
+    total_lifts,
+    open_km,
+    total_km,
+    snow_depth_min_cm,
+    snow_depth_max_cm,
+    avalanche_risk,
+    data_source,
+    reported_at
+FROM snow_reports
+ORDER BY reported_at DESC
+LIMIT 20;
+```
+
+Limitaciones actuales:
+
+- El scraper de Aramon es inicial y debe validarse con HTML real de cada
+  estacion.
+- Formigal/Panticosa comparten pagina, por lo que antes de automatizarlo hay
+  que confirmar como separa la web los datos de cada estacion.
+- Todavia no se extraen todos los tipos de pistas por color desde Aramon.
+- Los scrapers pueden romperse si la web origen cambia su HTML.
+
+## 11. Jobs manuales de datos reales
 
 TrackSki tiene un job agrupador para refrescar datos reales sin automatizarlos
 todavia:
@@ -483,6 +572,7 @@ Tambien se puede ejecutar por partes:
 ```bash
 python -m app.jobs.refresh_real_data --weather
 python -m app.jobs.refresh_real_data --forecast
+python -m app.jobs.refresh_real_data --snow
 python -m app.jobs.refresh_real_data --alerts
 python -m app.jobs.refresh_real_data --alerts --area 62 --area 61
 python -m app.jobs.refresh_real_data --roads
@@ -512,6 +602,7 @@ existentes:
 
 - Open-Meteo actual: `app.commands.ingest_weather`
 - Open-Meteo prevision: `app.commands.ingest_forecast`
+- Partes de nieve: `app.commands.ingest_snow_reports`
 - AEMET: `app.commands.ingest_alerts`
 - DGT DATEX2: `app.jobs.import_dgt_datex2_incidents`
 
@@ -534,6 +625,8 @@ python -m app.commands.ingest_weather
 python -m app.commands.ingest_weather --resort-id 1
 python -m app.commands.ingest_forecast
 python -m app.commands.ingest_forecast --resort-id 1
+python -m app.commands.debug_snow_scraper --provider aramon
+python -m app.commands.ingest_snow_reports
 python -m app.commands.ingest_alerts --area 62
 python -m app.jobs.import_dgt_datex2_incidents
 ```
@@ -542,6 +635,7 @@ Comportamiento por fuente:
 
 - Open-Meteo actual y prevision hacen una peticion por estacion porque necesitan
   coordenadas.
+- Partes de nieve hace una peticion por estacion configurada en el scraper.
 - AEMET hace una peticion por area AEMET unica, no por estacion.
 - DGT hace una peticion global al XML DATEX2 y filtra localmente por carreteras
   configuradas en `roads`.
@@ -550,6 +644,7 @@ Datos actualizados:
 
 - `weather_reports` con Open-Meteo actual.
 - `weather_forecasts` con Open-Meteo prevision.
+- `snow_reports` con los scrapers de partes de nieve.
 - `weather_alerts` con AEMET.
 - `road_incidents` y `road_conditions` con DGT DATEX2.
 
@@ -561,7 +656,7 @@ DGT_DATEX2_URL=
 DGT_DATEX2_TIMEOUT_SECONDS=
 ```
 
-## 11. Jobs automaticos
+## 12. Jobs automaticos
 
 El despliegue con `docker-compose.yml` incluye servicios one-shot para lanzar
 ingestas desde cron o systemd timer. No hay un proceso Python permanente mirando
@@ -573,6 +668,7 @@ Servicios disponibles:
 data_job_roads
 data_job_weather
 data_job_forecast
+data_job_snow
 data_job_alerts
 ```
 
@@ -582,6 +678,7 @@ Ejecutar manualmente:
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast
+docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_snow
 docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 ```
 
@@ -595,11 +692,13 @@ Orden recomendado:
 1. DGT DATEX2 nada mas desplegar o al arrancar el servidor.
 2. Open-Meteo nada mas desplegar o al arrancar el servidor.
 3. Prevision Open-Meteo nada mas desplegar o al arrancar el servidor.
-4. AEMET nada mas desplegar o al arrancar el servidor.
-5. DGT DATEX2 cada 15 min.
-6. Open-Meteo actual cada 30 min.
-7. AEMET cada 30 min.
-8. Prevision Open-Meteo cada 6 h.
+4. Partes de nieve nada mas desplegar o al arrancar el servidor.
+5. AEMET nada mas desplegar o al arrancar el servidor.
+6. DGT DATEX2 cada 15 min.
+7. Open-Meteo actual cada 30 min.
+8. AEMET cada 30 min.
+9. Prevision Open-Meteo cada 6 h.
+10. Partes de nieve cada 1-3 h cuando haya temporada.
 ```
 
 Ejemplo de cron en staging:
@@ -608,11 +707,12 @@ Ejemplo de cron en staging:
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-@reboot cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
+@reboot cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_snow ; docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 */15 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_roads
 */30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_weather
 */30 * * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_alerts
 0 */6 * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_forecast
+0 */2 * * * cd /home/pablo/proyectos/trackski/staging && docker compose --env-file .env -p trackski_staging --profile jobs run --rm data_job_snow
 ```
 
 Probar una ejecucion y ver el resultado en consola:
@@ -641,7 +741,7 @@ Limitaciones actuales:
   reales y no solo por region.
 - DGT solo guarda incidencias de carreteras configuradas en `roads`.
 
-## 12. Geometrias OSM de carreteras
+## 13. Geometrias OSM de carreteras
 
 Las geometrias reales de carreteras se pueden importar manualmente desde
 OpenStreetMap mediante Overpass API. Este job no se ejecuta en cron y no se
@@ -712,7 +812,7 @@ WHERE route IS NOT NULL;
 Las geometrias proceden de OpenStreetMap y deben atribuirse como:
 `© OpenStreetMap contributors`.
 
-## 13. Mapa basico de accesos
+## 14. Mapa basico de accesos
 
 La ficha de estacion incluye un primer mapa basico de accesos. De momento es un
 mapa esquematico SVG pensado para validar datos antes de incorporar un mapa real.
@@ -758,7 +858,7 @@ Siguientes mejoras posibles:
 - Mostrar pueblos o puntos de paso importantes.
 - Calcular rutas desde origenes habituales.
 
-## 14. Arquitectura de despliegue
+## 15. Arquitectura de despliegue
 
 Nginx mantiene los puertos `80/443` para otras aplicaciones del SERVER.
 TrackSki usa temporalmente Traefik en `8088`.
@@ -786,7 +886,7 @@ Seguridad de red:
 - `exposedByDefault=false`.
 - Staging y el dashboard usan `IPAllowList` de la LAN.
 
-## 15. Traefik temporal
+## 16. Traefik temporal
 
 Crear la red externa una vez:
 
@@ -818,7 +918,7 @@ IP_DEL_SERVER traefik.local
 IP_DEL_SERVER staging.miapp.local
 ```
 
-## 16. Staging y main
+## 17. Staging y main
 
 Rutas utilizadas por GitHub Actions:
 
@@ -856,7 +956,7 @@ docker compose --env-file .env -p trackski_main up -d --build
 
 No ejecutar ambos comandos desde la misma carpeta.
 
-## 17. Despliegue automatico
+## 18. Despliegue automatico
 
 `.github/workflows/deploy.yml` se ejecuta al hacer push:
 
@@ -882,7 +982,7 @@ El workflow:
 
 No modifica ni reinicia Nginx.
 
-## 18. Comprobaciones
+## 19. Comprobaciones
 
 Estado:
 
@@ -920,7 +1020,7 @@ sudo ss -tulpn | grep -E '3000|3001|5432|8088'
 
 Debe aparecer `8088`. No deben publicarse `3000`, `3001` ni `5432`.
 
-## 19. Problemas habituales
+## 20. Problemas habituales
 
 ### Error de autenticacion PostgreSQL
 
@@ -953,7 +1053,7 @@ Los scripts de inicializacion no son migraciones. Solo se ejecutan al crear el
 volumen. Mientras no se incorpore Alembic, los cambios deben aplicarse
 manualmente o recreando una DB descartable.
 
-## 20. Migracion futura a 80/443
+## 21. Migracion futura a 80/443
 
 No realizarla todavia.
 

@@ -102,6 +102,20 @@ services:
       - internal
       - job_egress
 
+  data_job_snow:
+    build:
+      context: ./backend
+    profiles: ["jobs"]
+    restart: "no"
+    command: ["python", "-m", "app.jobs.refresh_real_data", "--snow"]
+    environment: *job-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - job_egress
+
   data_job_alerts:
     build:
       context: ./backend

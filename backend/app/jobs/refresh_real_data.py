@@ -1,7 +1,7 @@
 import argparse
 from collections.abc import Callable
 
-from app.commands import ingest_alerts, ingest_forecast, ingest_weather
+from app.commands import ingest_alerts, ingest_forecast, ingest_snow_reports, ingest_weather
 from app.jobs import import_dgt_datex2_incidents
 from app.jobs.result import JobResult, print_job_result
 
@@ -10,7 +10,7 @@ JobRunner = Callable[[], JobResult]
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Refresca datos reales de meteorologia, avisos y carreteras."
+        description="Refresca datos reales de nieve, meteorologia, avisos y carreteras."
     )
     parser.add_argument("--all", action="store_true", help="Ejecuta todos los jobs.")
     parser.add_argument("--weather", action="store_true", help="Ejecuta Open-Meteo.")
@@ -19,6 +19,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Ejecuta prevision meteorologica Open-Meteo.",
     )
+    parser.add_argument("--snow", action="store_true", help="Ejecuta partes de nieve.")
     parser.add_argument("--alerts", action="store_true", help="Ejecuta avisos AEMET.")
     parser.add_argument("--roads", action="store_true", help="Ejecuta incidencias DGT.")
     parser.add_argument(
@@ -45,6 +46,8 @@ def selected_jobs(args: argparse.Namespace) -> list[tuple[str, JobRunner]]:
         jobs.append(("weather", lambda: ingest_weather.run(resort_id=args.resort_id)))
     if run_all or args.forecast:
         jobs.append(("forecast", lambda: ingest_forecast.run(resort_id=args.resort_id)))
+    if run_all or args.snow:
+        jobs.append(("snow", ingest_snow_reports.run))
     if run_all or args.alerts:
         jobs.append(("alerts", lambda: _run_alerts(args.area)))
     if run_all or args.roads:
@@ -58,13 +61,13 @@ def _run_alerts(area: list[str] | None) -> JobResult:
 
 
 def run(args: argparse.Namespace) -> list[JobResult]:
-    if not any([args.all, args.weather, args.forecast, args.alerts, args.roads]):
+    if not any([args.all, args.weather, args.forecast, args.snow, args.alerts, args.roads]):
         return [
             JobResult.failed(
                 "refresh_real_data",
                 (
                     "Selecciona al menos una opcion: --all, --weather, "
-                    "--forecast, --alerts o --roads."
+                    "--forecast, --snow, --alerts o --roads."
                 ),
             )
         ]

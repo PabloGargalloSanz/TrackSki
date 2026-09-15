@@ -103,6 +103,10 @@ function compactNumber(value: number | null): string {
   return value === null ? "-" : new Intl.NumberFormat("es-ES").format(value);
 }
 
+function isClosedSnowReport(accessStatus: string | null): boolean {
+  return accessStatus?.toLocaleLowerCase("es-ES").includes("cerrada") ?? false;
+}
+
 function kmRange(incident: RoadIncident): string {
   const { start_km: start, end_km: end } = incident;
 
@@ -256,6 +260,7 @@ export default async function ResortDetailPage({
     access_status: accessStatus,
   } = summary;
   const incidentGroups = groupIncidentsBySeverity(accessStatus.incidents);
+  const isSnowReportClosed = snow ? isClosedSnowReport(snow.access_status) : false;
 
   return (
     <main className="page">
@@ -287,58 +292,67 @@ export default async function ResortDetailPage({
         <section className="detail-section">
           <div className="section-heading">
             <h2>Nieve y pistas</h2>
-            {snow && <time>{formatDate(snow.reported_at)}</time>}
+            {snow && !isSnowReportClosed && <time>{formatDate(snow.reported_at)}</time>}
           </div>
           {snow ? (
             <>
-              <dl className="metric-grid">
-                <div>
-                  <dt>Remontes</dt>
-                  <dd>
-                    {snow.open_lifts} / {snow.total_lifts}
-                  </dd>
+              {isSnowReportClosed && (
+                <div className="snow-status-banner">
+                  <strong>{snow.access_status}</strong>
                 </div>
-                <div>
-                  <dt>Kilometros abiertos</dt>
-                  <dd>
-                    {snow.open_km} / {snow.total_km} km
-                  </dd>
-                </div>
-                <div>
-                  <dt>Espesor minimo</dt>
-                  <dd>{valueOrDash(snow.snow_depth_min_cm, " cm")}</dd>
-                </div>
-                <div>
-                  <dt>Espesor maximo</dt>
-                  <dd>{valueOrDash(snow.snow_depth_max_cm, " cm")}</dd>
-                </div>
-                <div>
-                  <dt>Riesgo de aludes</dt>
-                  <dd>{valueOrDash(snow.avalanche_risk, " / 5")}</dd>
-                </div>
-                <div>
-                  <dt>Acceso</dt>
-                  <dd>{snow.access_status ?? "-"}</dd>
-                </div>
-              </dl>
-              <dl className="trail-grid">
-                <div>
-                  <dt>Verdes</dt>
-                  <dd>{snow.green_trails.open} / {snow.green_trails.total}</dd>
-                </div>
-                <div>
-                  <dt>Azules</dt>
-                  <dd>{snow.blue_trails.open} / {snow.blue_trails.total}</dd>
-                </div>
-                <div>
-                  <dt>Rojas</dt>
-                  <dd>{snow.red_trails.open} / {snow.red_trails.total}</dd>
-                </div>
-                <div>
-                  <dt>Negras</dt>
-                  <dd>{snow.black_trails.open} / {snow.black_trails.total}</dd>
-                </div>
-              </dl>
+              )}
+              {!isSnowReportClosed && (
+                <>
+                  <dl className="metric-grid">
+                    <div>
+                      <dt>Remontes</dt>
+                      <dd>
+                        {snow.open_lifts} / {snow.total_lifts}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Kilometros abiertos</dt>
+                      <dd>
+                        {snow.open_km} / {snow.total_km} km
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Espesor minimo</dt>
+                      <dd>{valueOrDash(snow.snow_depth_min_cm, " cm")}</dd>
+                    </div>
+                    <div>
+                      <dt>Espesor maximo</dt>
+                      <dd>{valueOrDash(snow.snow_depth_max_cm, " cm")}</dd>
+                    </div>
+                    <div>
+                      <dt>Riesgo de aludes</dt>
+                      <dd>{valueOrDash(snow.avalanche_risk, " / 5")}</dd>
+                    </div>
+                    <div>
+                      <dt>Acceso</dt>
+                      <dd>{snow.access_status ?? "-"}</dd>
+                    </div>
+                  </dl>
+                  <dl className="trail-grid">
+                    <div>
+                      <dt>Verdes</dt>
+                      <dd>{snow.green_trails.open} / {snow.green_trails.total}</dd>
+                    </div>
+                    <div>
+                      <dt>Azules</dt>
+                      <dd>{snow.blue_trails.open} / {snow.blue_trails.total}</dd>
+                    </div>
+                    <div>
+                      <dt>Rojas</dt>
+                      <dd>{snow.red_trails.open} / {snow.red_trails.total}</dd>
+                    </div>
+                    <div>
+                      <dt>Negras</dt>
+                      <dd>{snow.black_trails.open} / {snow.black_trails.total}</dd>
+                    </div>
+                  </dl>
+                </>
+              )}
             </>
           ) : (
             <p className="empty-message">No hay partes de nieve disponibles.</p>
