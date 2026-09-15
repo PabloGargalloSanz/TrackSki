@@ -10,6 +10,8 @@ def make_args(
     *,
     all: bool = False,
     weather: bool = False,
+    forecast: bool = False,
+    snow: bool = False,
     alerts: bool = False,
     roads: bool = False,
     area: list[str] | None = None,
@@ -18,6 +20,8 @@ def make_args(
     return argparse.Namespace(
         all=all,
         weather=weather,
+        forecast=forecast,
+        snow=snow,
         alerts=alerts,
         roads=roads,
         area=area,
@@ -37,20 +41,24 @@ class RefreshRealDataTest(unittest.TestCase):
 
         self.assertEqual(
             [job_key for job_key, _ in jobs],
-            ["weather", "alerts", "roads"],
+            ["weather", "forecast", "snow", "alerts", "roads"],
         )
 
     def test_selects_only_requested_jobs(self) -> None:
-        jobs = selected_jobs(make_args(weather=True, roads=True))
+        jobs = selected_jobs(make_args(weather=True, snow=True, roads=True))
 
-        self.assertEqual([job_key for job_key, _ in jobs], ["weather", "roads"])
+        self.assertEqual([job_key for job_key, _ in jobs], ["weather", "snow", "roads"])
 
     @patch("app.jobs.refresh_real_data.import_dgt_datex2_incidents.run")
     @patch("app.jobs.refresh_real_data.ingest_alerts.run")
+    @patch("app.jobs.refresh_real_data.ingest_snow_reports.run")
+    @patch("app.jobs.refresh_real_data.ingest_forecast.run")
     @patch("app.jobs.refresh_real_data.ingest_weather.run")
     def test_runs_selected_jobs(
         self,
         weather_run: Mock,
+        forecast_run: Mock,
+        snow_run: Mock,
         alerts_run: Mock,
         roads_run: Mock,
     ) -> None:
@@ -63,28 +71,47 @@ class RefreshRealDataTest(unittest.TestCase):
         self.assertEqual([result.job_name for result in results], ["AEMET alerts"])
         alerts_run.assert_called_once_with(areas=["62"])
         weather_run.assert_not_called()
+        forecast_run.assert_not_called()
+        snow_run.assert_not_called()
         roads_run.assert_not_called()
 
     @patch("app.jobs.refresh_real_data.import_dgt_datex2_incidents.run")
     @patch("app.jobs.refresh_real_data.ingest_alerts.run")
+    @patch("app.jobs.refresh_real_data.ingest_snow_reports.run")
+    @patch("app.jobs.refresh_real_data.ingest_forecast.run")
     @patch("app.jobs.refresh_real_data.ingest_weather.run")
     def test_continues_when_a_job_fails(
         self,
         weather_run: Mock,
+        forecast_run: Mock,
+        snow_run: Mock,
         alerts_run: Mock,
         roads_run: Mock,
     ) -> None:
         weather_run.return_value = JobResult(job_name="Weather")
+        forecast_run.return_value = JobResult(job_name="Weather forecast")
+        snow_run.return_value = JobResult(job_name="Snow reports")
         alerts_run.side_effect = RuntimeError("AEMET unavailable")
         roads_run.return_value = JobResult(job_name="DGT roads")
 
         results = run(make_args(all=True, area=["62"]))
 
-        self.assertEqual(len(results), 3)
+        self.assertEqual(len(results), 5)
         self.assertEqual(results[0].status, "success")
-        self.assertEqual(results[1].status, "failed")
-        self.assertEqual(results[1].errors, ["AEMET unavailable"])
+        self.assertEqual(results[1].status, "success")
         self.assertEqual(results[2].status, "success")
+        self.assertEqual(results[3].status, "failed")
+        self.assertEqual(results[3].errors, ["AEMET unavailable"])
+        self.assertEqual(results[4].status, "success")
+
+    @patch("app.jobs.refresh_real_data.ingest_snow_reports.run")
+    def test_snow_job_can_run_on_its_own(self, snow_run: Mock) -> None:
+        snow_run.return_value = JobResult(job_name="Snow reports")
+
+        results = run(make_args(snow=True))
+
+        self.assertEqual(results[0].status, "success")
+        snow_run.assert_called_once_with()
 
     @patch("app.jobs.refresh_real_data.ingest_alerts.run")
     def test_alerts_can_run_without_manual_area(self, alerts_run: Mock) -> None:
