@@ -39,8 +39,12 @@ const accessStatusLabels: Record<string, string> = {
 
 const weatherIcons: Record<string, string> = {
   clear: "/weather/clear.svg",
+  partlyClear: "/weather/partly-clear.svg",
+  partlyCloudy: "/weather/partly-cloudy.svg",
   cloud: "/weather/cloud.svg",
+  rainLight: "/weather/rain-light.svg",
   rain: "/weather/rain.svg",
+  rainHeavy: "/weather/rain-heavy.svg",
   snow: "/weather/snow.svg",
   storm: "/weather/storm.svg",
   fog: "/weather/fog.svg",
@@ -63,16 +67,49 @@ function weatherIconType(weather: string | null): keyof typeof weatherIcons {
     normalizedWeather.includes("llovizna") ||
     normalizedWeather.includes("chubasco")
   ) {
+    if (
+      normalizedWeather.includes("moderada") ||
+      normalizedWeather.includes("fuerte") ||
+      normalizedWeather.includes("intensa")
+    ) {
+      return "rainHeavy";
+    }
+    if (
+      normalizedWeather.includes("ligera") ||
+      normalizedWeather.includes("leve") ||
+      normalizedWeather.includes("llovizna")
+    ) {
+      return "rainLight";
+    }
     return "rain";
   }
   if (normalizedWeather.includes("niebla")) {
     return "fog";
   }
   if (
+    normalizedWeather.includes("principalmente despejado") ||
+    normalizedWeather.includes("poco nuboso")
+  ) {
+    return "partlyClear";
+  }
+  if (
+    normalizedWeather.includes("parcialmente nuboso") ||
+    normalizedWeather.includes("parcialmente cubierto")
+  ) {
+    return "partlyCloudy";
+  }
+  if (
     normalizedWeather.includes("despejado") &&
     !normalizedWeather.includes("nuboso")
   ) {
     return "clear";
+  }
+  if (
+    normalizedWeather.includes("cubierto") ||
+    normalizedWeather.includes("nuboso") ||
+    normalizedWeather.includes("nublado")
+  ) {
+    return "cloud";
   }
 
   return "cloud";
