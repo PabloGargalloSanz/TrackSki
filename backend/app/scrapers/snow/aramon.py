@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 import re
 import unicodedata
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -11,6 +12,33 @@ from app.services.snow.models import SnowReportData
 
 
 SOURCE = "aramon"
+SPANISH_TIMEZONE = ZoneInfo("Europe/Madrid")
+
+ARAMON_RESORTS = [
+    SnowScraperResort(
+        resort_id=0,
+        name="Cerler",
+        url="https://www.cerler.com/partes/parteNieve?prevision=0",
+    ),
+    SnowScraperResort(
+        resort_id=0,
+        name="Formigal",
+        url="https://www.formigal-panticosa.com/partes/parteNieve?prevision=0",
+    ),
+    #SnowScraperResort(
+        #resort_id=0,
+        #name="Panticosa",
+        #url="https://www.formigal-panticosa.com/partes/parteNieve?prevision=0",
+    #),
+    SnowScraperResort(
+        resort_id=0,
+        name="Valdelinares",
+        url=(
+            "https://www.javalambre-valdelinares.com/partes/parteNieve"
+            "?prevision=0&estacion=4"
+        ),
+    ),
+]
 
 
 class AramonSnowScraper:
@@ -44,9 +72,12 @@ def parse_aramon_snow_report(
     open_km, total_km = _find_decimal_pair(items, "kilometros")
     snow_depth_min_cm, snow_depth_max_cm = _find_depth_range(items)
     avalanche_risk = _find_avalanche_risk(parser.footer_text)
+    full_text = " ".join(parser.all_text)
+    access_status = _find_access_status(full_text, has_snow_report_items=bool(items))
+    parsed_reported_at = _find_reported_at(full_text)
 
     return SnowReportData(
-        reported_at=reported_at or datetime.now(timezone.utc),
+        reported_at=reported_at or parsed_reported_at or datetime.now(timezone.utc),
         open_lifts=open_lifts,
         total_lifts=total_lifts,
         open_km=open_km,
@@ -54,8 +85,9 @@ def parse_aramon_snow_report(
         snow_depth_min_cm=snow_depth_min_cm,
         snow_depth_max_cm=snow_depth_max_cm,
         avalanche_risk=avalanche_risk,
+        access_status=access_status,
         data_source=SOURCE,
-        is_verified=False,
+        is_verified=True,
     )
 
 
@@ -71,6 +103,7 @@ class _AramonSnowReportParser(HTMLParser):
         super().__init__()
         self.items: list[_SnowReportItem] = []
         self.footer_text: list[str] = []
+        self.all_text: list[str] = []
         self._current_item: _SnowReportItem | None = None
         self._current_field: str | None = None
         self._in_footer_text = False
@@ -112,6 +145,8 @@ class _AramonSnowReportParser(HTMLParser):
         text = " ".join(data.split())
         if not text:
             return
+
+        self.all_text.append(text)
 
         if self._current_item and self._current_field:
             current_value = getattr(self._current_item, self._current_field)
@@ -207,6 +242,61 @@ def _find_avalanche_risk(footer_text: list[str]) -> int | None:
         return int(match.group(1))
 
     return None
+
+
+def _find_access_status(text: str, has_snow_report_items: bool) -> str | None:
+    normalized_text = _normalize_text(text)
+    if "estacion cerrada" in normalized_text or "fin de temporada" in normalized_text:
+        return "Estacion cerrada"
+    if "estacion abierta" in normalized_text:
+        return "Estacion abierta"
+    if not has_snow_report_items:
+        return "Sin datos"
+    return None
+
+
+def _find_reported_at(text: str) -> datetime | None:
+    normalized_text = _normalize_text(text)
+    match = re.search(
+        r"emitido a las\s+(\d{1,2}):(\d{2})\s+h\s+del\s+"
+        r"(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})",
+        normalized_text,
+    )
+    if not match:
+        return None
+
+    month = _spanish_month_to_number(match.group(4))
+    if month is None:
+        return None
+
+    local_reported_at = datetime(
+        int(match.group(5)),
+        month,
+        int(match.group(3)),
+        int(match.group(1)),
+        int(match.group(2)),
+        tzinfo=SPANISH_TIMEZONE,
+    )
+    return local_reported_at.astimezone(timezone.utc)
+
+
+def _spanish_month_to_number(month: str) -> int | None:
+    months = {
+        "enero": 1,
+        "febrero": 2,
+        "marzo": 3,
+        "abril": 4,
+        "mayo": 5,
+        "junio": 6,
+        "julio": 7,
+        "agosto": 8,
+        "septiembre": 9,
+        "setiembre": 9,
+        "octubre": 10,
+        "noviembre": 11,
+        "diciembre": 12,
+    }
+    return months.get(month)
 
 
 def _extract_numbers(value: str) -> list[Decimal]:

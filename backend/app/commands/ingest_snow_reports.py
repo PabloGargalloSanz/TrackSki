@@ -6,17 +6,8 @@ from app.db.session import SessionLocal
 from app.jobs.result import JobResult, print_job_result
 from app.repositories.resorts import get_resorts
 from app.repositories.snow_reports import create_snow_report_if_missing
-from app.scrapers.snow.aramon import AramonSnowScraper
+from app.scrapers.snow.aramon import ARAMON_RESORTS, AramonSnowScraper
 from app.scrapers.snow.base import SnowScraperResort
-
-
-DEFAULT_ARAMON_RESORTS = [
-    SnowScraperResort(
-        resort_id=0,
-        name="Cerler",
-        url="https://www.cerler.com/partes/parteNieve?prevision=0",
-    ),
-]
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,7 +65,7 @@ def run(
         configured_resorts = (
             [SnowScraperResort(resort_id=0, name=resort_name, url=url)]
             if resort_name and url
-            else DEFAULT_ARAMON_RESORTS
+            else ARAMON_RESORTS
         )
 
         scraper = AramonSnowScraper()
