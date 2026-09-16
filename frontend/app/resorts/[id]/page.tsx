@@ -314,15 +314,6 @@ export default async function ResortDetailPage({
             {resort.country}
           </p>
         </div>
-        <span
-          className={
-            resort.is_verified
-              ? "data-badge data-badge--verified"
-              : "data-badge"
-          }
-        >
-          {resort.is_verified ? "Verificado" : "Datos de prueba"}
-        </span>
       </header>
 
       <div className="detail-grid">

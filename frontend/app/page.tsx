@@ -98,13 +98,19 @@ function accessStatusTone(summary: ResortSummary | null): string {
   return status;
 }
 
+function compactKm(value: number): string {
+  return new Intl.NumberFormat("es-ES", {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 1,
+  }).format(value);
+}
+
 function skiableKm(summary: ResortSummary | null): string {
   const snow = summary?.latest_snow_report;
   if (!snow) {
     return "0 / 0 km";
   }
 
-  return `${snow.open_km} / ${snow.total_km} km`;
+  return `${compactKm(snow.open_km)} / ${compactKm(snow.total_km)} km`;
 }
 
 export default async function Home() {
