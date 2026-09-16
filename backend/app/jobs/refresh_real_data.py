@@ -1,9 +1,13 @@
 import argparse
 from collections.abc import Callable
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from app.commands import ingest_alerts, ingest_forecast, ingest_snow_reports, ingest_weather
+from app.db.session import SessionLocal
 from app.jobs import import_dgt_datex2_incidents
 from app.jobs.result import JobResult, print_job_result
+from app.repositories.job_audit_runs import create_job_audit_run
 
 JobRunner = Callable[[], JobResult]
 
@@ -38,7 +42,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def selected_jobs(args: argparse.Namespace) -> list[tuple[str, JobRunner]]:
+def selected_jobs(
+    args: argparse.Namespace,
+    run_group_id: str | None = None,
+) -> list[tuple[str, JobRunner]]:
     run_all = args.all
     jobs: list[tuple[str, JobRunner]] = []
 
@@ -47,7 +54,12 @@ def selected_jobs(args: argparse.Namespace) -> list[tuple[str, JobRunner]]:
     if run_all or args.forecast:
         jobs.append(("forecast", lambda: ingest_forecast.run(resort_id=args.resort_id)))
     if run_all or args.snow:
-        jobs.append(("snow", ingest_snow_reports.run))
+        jobs.append(
+            (
+                "snow",
+                lambda: ingest_snow_reports.run(audit_run_group_id=run_group_id),
+            )
+        )
     if run_all or args.alerts:
         jobs.append(("alerts", lambda: _run_alerts(args.area)))
     if run_all or args.roads:
@@ -74,13 +86,69 @@ def run(args: argparse.Namespace) -> list[JobResult]:
 
     results: list[JobResult] = []
 
-    for job_key, runner in selected_jobs(args):
+    run_group_id = str(uuid4())
+
+    for job_key, runner in selected_jobs(args, run_group_id=run_group_id):
+        started_at = datetime.now(timezone.utc)
         try:
-            results.append(runner())
+            result = runner()
         except Exception as error:
-            results.append(JobResult.failed(job_key, error))
+            result = JobResult.failed(job_key, error)
+
+        _store_job_run(
+            job_key,
+            result,
+            started_at,
+            datetime.now(timezone.utc),
+            run_group_id=run_group_id,
+        )
+        results.append(result)
 
     return results
+
+
+def _store_job_run(
+    job_key: str,
+    result: JobResult,
+    started_at: datetime,
+    finished_at: datetime,
+    run_group_id: str | None = None,
+) -> None:
+    db = SessionLocal()
+    try:
+        create_job_audit_run(
+            db,
+            run_group_id=run_group_id or str(uuid4()),
+            job_key=job_key,
+            provider=_provider_for_job(job_key),
+            target_type="job",
+            target_name=result.job_name,
+            status=result.status,
+            processed=result.processed,
+            inserted=result.inserted,
+            updated=result.updated,
+            skipped=result.skipped,
+            error_message="; ".join(result.errors) or result.message,
+            metadata=result.metadata,
+            started_at=started_at,
+            finished_at=finished_at,
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def _provider_for_job(job_key: str) -> str | None:
+    providers = {
+        "weather": "open_meteo",
+        "forecast": "open_meteo",
+        "snow": "snow_scrapers",
+        "alerts": "aemet",
+        "roads": "dgt_datex2",
+    }
+    return providers.get(job_key)
 
 
 def main() -> int:

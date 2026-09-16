@@ -77,7 +77,7 @@ class IngestSnowReportsTest(unittest.TestCase):
             resort_id=1,
             report=report,
         )
-        self.assertEqual(db.commit.call_count, len(configured_resorts))
+        self.assertEqual(db.commit.call_count, len(configured_resorts) * 2)
         aramon_scraper.close.assert_called_once()
         astun_candanchu_scraper.close.assert_called_once()
         baqueira_scraper.close.assert_called_once()
