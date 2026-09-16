@@ -12,6 +12,7 @@ from app.scrapers.snow.astun_candanchu import (
     ASTUN_CANDANCHU_RESORTS,
     AstunCandanchuSnowScraper,
 )
+from app.scrapers.snow.baqueira import BAQUEIRA_RESORTS, BaqueiraSnowScraper
 from app.scrapers.snow.base import SnowScraperResort
 
 
@@ -19,6 +20,7 @@ def scraper_configs():
     return {
         "aramon": (AramonSnowScraper, ARAMON_RESORTS),
         "astun_candanchu": (AstunCandanchuSnowScraper, ASTUN_CANDANCHU_RESORTS),
+        "baqueira": (BaqueiraSnowScraper, BAQUEIRA_RESORTS),
     }
 
 
