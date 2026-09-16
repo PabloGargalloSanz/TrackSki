@@ -1,13 +1,25 @@
 import argparse
 
 import httpx
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.session import SessionLocal
 from app.jobs.result import JobResult, print_job_result
 from app.repositories.resorts import get_resorts
 from app.repositories.snow_reports import create_snow_report_if_missing
 from app.scrapers.snow.aramon import ARAMON_RESORTS, AramonSnowScraper
+from app.scrapers.snow.astun_candanchu import (
+    ASTUN_CANDANCHU_RESORTS,
+    AstunCandanchuSnowScraper,
+)
 from app.scrapers.snow.base import SnowScraperResort
+
+
+def scraper_configs():
+    return {
+        "aramon": (AramonSnowScraper, ARAMON_RESORTS),
+        "astun_candanchu": (AstunCandanchuSnowScraper, ASTUN_CANDANCHU_RESORTS),
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,9 +28,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--provider",
-        choices=["aramon"],
-        default="aramon",
-        help="Proveedor a importar. Por defecto aramon.",
+        choices=["all", *scraper_configs().keys()],
+        default="all",
+        help="Proveedor a importar. Por defecto all.",
     )
     parser.add_argument(
         "--resort-name",
@@ -43,13 +55,14 @@ def main() -> int:
 
 
 def run(
-    provider: str = "aramon",
+    provider: str = "all",
     resort_name: str | None = None,
     url: str | None = None,
 ) -> JobResult:
     result = JobResult(job_name="Snow reports")
 
-    if provider != "aramon":
+    configs = scraper_configs()
+    if provider not in {"all", *configs.keys()}:
         result.status = "failed"
         result.message = f"Proveedor no soportado: {provider}"
         return result
@@ -62,55 +75,59 @@ def run(
     db = SessionLocal()
     try:
         db_resorts = {resort["name"]: resort for resort in get_resorts(db)}
-        configured_resorts = (
-            [SnowScraperResort(resort_id=0, name=resort_name, url=url)]
-            if resort_name and url
-            else ARAMON_RESORTS
-        )
+        providers = [provider] if provider != "all" else list(configs)
+        result.metadata["providers"] = ", ".join(providers)
 
-        scraper = AramonSnowScraper()
-        try:
-            for configured_resort in configured_resorts:
-                result.processed += 1
-                resort = db_resorts.get(configured_resort.name)
-                if not resort:
-                    result.skipped += 1
-                    result.errors.append(
-                        f"{configured_resort.name}: estacion no encontrada en DB"
-                    )
-                    continue
+        for selected_provider in providers:
+            scraper_class, default_resorts = configs[selected_provider]
+            configured_resorts = (
+                [SnowScraperResort(resort_id=0, name=resort_name, url=url)]
+                if resort_name and url
+                else default_resorts
+            )
 
-                try:
-                    report = scraper.get_current(
-                        SnowScraperResort(
-                            resort_id=resort["id"],
-                            name=configured_resort.name,
-                            url=configured_resort.url,
+            scraper = scraper_class()
+            try:
+                for configured_resort in configured_resorts:
+                    result.processed += 1
+                    resort = db_resorts.get(configured_resort.name)
+                    if not resort:
+                        result.skipped += 1
+                        result.errors.append(
+                            f"{configured_resort.name}: estacion no encontrada en DB"
                         )
-                    )
-                    report_id = create_snow_report_if_missing(
-                        db,
-                        resort_id=resort["id"],
-                        report=report,
-                    )
-                    db.commit()
-                except (httpx.HTTPError, ValueError) as error:
-                    db.rollback()
-                    result.skipped += 1
-                    result.errors.append(f"{configured_resort.name}: {error}")
-                    continue
+                        continue
 
-                if report_id:
-                    result.inserted += 1
-                else:
-                    result.skipped += 1
-        finally:
-            scraper.close()
+                    try:
+                        report = scraper.get_current(
+                            SnowScraperResort(
+                                resort_id=resort["id"],
+                                name=configured_resort.name,
+                                url=configured_resort.url,
+                            )
+                        )
+                        report_id = create_snow_report_if_missing(
+                            db,
+                            resort_id=resort["id"],
+                            report=report,
+                        )
+                        db.commit()
+                    except (httpx.HTTPError, SQLAlchemyError, ValueError) as error:
+                        db.rollback()
+                        result.skipped += 1
+                        result.errors.append(f"{configured_resort.name}: {error}")
+                        continue
+
+                    if report_id:
+                        result.inserted += 1
+                    else:
+                        result.skipped += 1
+            finally:
+                scraper.close()
 
         if result.errors:
             result.status = "partial"
 
-        result.metadata["provider"] = provider
         return result
     finally:
         db.close()
