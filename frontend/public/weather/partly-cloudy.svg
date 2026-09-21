@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Parcialmente nuboso">
+  <circle cx="23" cy="24" r="12" fill="#f8c33c"/>
+  <g stroke="#f8c33c" stroke-linecap="round" stroke-width="4">
+    <path d="M23 6v7"/>
+    <path d="M7 24h7"/>
+    <path d="m11 11 5 5"/>
+    <path d="m35 11-5 5"/>
+  </g>
+  <path fill="#94a3b8" d="M20 49h31a10 10 0 0 0 1-20 16 16 0 0 0-30-4A12 12 0 0 0 20 49Z"/>
+  <path fill="#cbd5e1" d="M15 49h32a9 9 0 0 0 1-18 15 15 0 0 0-28-4A11 11 0 0 0 15 49Z"/>
+</svg>

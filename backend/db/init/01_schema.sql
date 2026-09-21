@@ -352,7 +352,41 @@ CREATE TABLE IF NOT EXISTS weather_alerts (
 );
 
 
--- 5. ÍNDICES ESPACIALES
+-- 5. EJECUCIONES DE JOBS
+
+CREATE TABLE IF NOT EXISTS job_audit_runs (
+    id SERIAL PRIMARY KEY,
+    run_group_id VARCHAR(80) NOT NULL,
+    job_key VARCHAR(80) NOT NULL,
+    provider VARCHAR(100),
+    target_type VARCHAR(50),
+    target_id VARCHAR(100),
+    target_name VARCHAR(150),
+    status VARCHAR(30) NOT NULL,
+    processed INT NOT NULL DEFAULT 0,
+    inserted INT NOT NULL DEFAULT 0,
+    updated INT NOT NULL DEFAULT 0,
+    skipped INT NOT NULL DEFAULT 0,
+    error_message TEXT,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_job_audit_runs_status CHECK (
+        status IN ('success', 'partial', 'failed')
+    ),
+
+    CONSTRAINT chk_job_audit_runs_counters CHECK (
+        processed >= 0
+        AND inserted >= 0
+        AND updated >= 0
+        AND skipped >= 0
+    )
+);
+
+
+-- 6. ÍNDICES ESPACIALES
  
 
 CREATE INDEX IF NOT EXISTS idx_ski_resorts_location
@@ -439,6 +473,18 @@ ON weather_alerts(expires);
 
 CREATE INDEX IF NOT EXISTS idx_weather_alerts_area
 ON weather_alerts(area);
+
+CREATE INDEX IF NOT EXISTS idx_job_audit_runs_created_at
+ON job_audit_runs(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_job_audit_runs_group_id
+ON job_audit_runs(run_group_id);
+
+CREATE INDEX IF NOT EXISTS idx_job_audit_runs_job_provider_created_at
+ON job_audit_runs(job_key, provider, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_job_audit_runs_status_created_at
+ON job_audit_runs(status, created_at DESC);
 
 
 -- 7. VISTAS

@@ -1,6 +1,6 @@
 import argparse
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from app.jobs.refresh_real_data import run, selected_jobs
 from app.jobs.result import JobResult
@@ -54,8 +54,10 @@ class RefreshRealDataTest(unittest.TestCase):
     @patch("app.jobs.refresh_real_data.ingest_snow_reports.run")
     @patch("app.jobs.refresh_real_data.ingest_forecast.run")
     @patch("app.jobs.refresh_real_data.ingest_weather.run")
+    @patch("app.jobs.refresh_real_data._store_job_run")
     def test_runs_selected_jobs(
         self,
+        store_job_run: Mock,
         weather_run: Mock,
         forecast_run: Mock,
         snow_run: Mock,
@@ -70,6 +72,8 @@ class RefreshRealDataTest(unittest.TestCase):
 
         self.assertEqual([result.job_name for result in results], ["AEMET alerts"])
         alerts_run.assert_called_once_with(areas=["62"])
+        self.assertEqual(store_job_run.call_args.args[0], "alerts")
+        self.assertEqual(store_job_run.call_args.args[1].job_name, "AEMET alerts")
         weather_run.assert_not_called()
         forecast_run.assert_not_called()
         snow_run.assert_not_called()
@@ -80,8 +84,10 @@ class RefreshRealDataTest(unittest.TestCase):
     @patch("app.jobs.refresh_real_data.ingest_snow_reports.run")
     @patch("app.jobs.refresh_real_data.ingest_forecast.run")
     @patch("app.jobs.refresh_real_data.ingest_weather.run")
+    @patch("app.jobs.refresh_real_data._store_job_run")
     def test_continues_when_a_job_fails(
         self,
+        store_job_run: Mock,
         weather_run: Mock,
         forecast_run: Mock,
         snow_run: Mock,
@@ -103,24 +109,39 @@ class RefreshRealDataTest(unittest.TestCase):
         self.assertEqual(results[3].status, "failed")
         self.assertEqual(results[3].errors, ["AEMET unavailable"])
         self.assertEqual(results[4].status, "success")
+        self.assertEqual(store_job_run.call_count, 5)
+        self.assertEqual(store_job_run.call_args_list[3].args[0], "alerts")
+        self.assertEqual(store_job_run.call_args_list[3].args[1].status, "failed")
 
+    @patch("app.jobs.refresh_real_data._store_job_run")
     @patch("app.jobs.refresh_real_data.ingest_snow_reports.run")
-    def test_snow_job_can_run_on_its_own(self, snow_run: Mock) -> None:
+    def test_snow_job_can_run_on_its_own(
+        self,
+        snow_run: Mock,
+        store_job_run: Mock,
+    ) -> None:
         snow_run.return_value = JobResult(job_name="Snow reports")
 
         results = run(make_args(snow=True))
 
         self.assertEqual(results[0].status, "success")
-        snow_run.assert_called_once_with()
+        snow_run.assert_called_once_with(audit_run_group_id=ANY)
+        self.assertEqual(store_job_run.call_args.args[0], "snow")
 
+    @patch("app.jobs.refresh_real_data._store_job_run")
     @patch("app.jobs.refresh_real_data.ingest_alerts.run")
-    def test_alerts_can_run_without_manual_area(self, alerts_run: Mock) -> None:
+    def test_alerts_can_run_without_manual_area(
+        self,
+        alerts_run: Mock,
+        store_job_run: Mock,
+    ) -> None:
         alerts_run.return_value = JobResult(job_name="AEMET alerts")
 
         results = run(make_args(alerts=True))
 
         self.assertEqual(results[0].status, "success")
         alerts_run.assert_called_once_with(areas=None)
+        self.assertEqual(store_job_run.call_args.args[0], "alerts")
 
 
 if __name__ == "__main__":
