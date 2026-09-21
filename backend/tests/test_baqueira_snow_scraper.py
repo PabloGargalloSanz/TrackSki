@@ -4,10 +4,12 @@ import unittest
 
 from app.scrapers.snow.baqueira import (
     BAQUEIRA_RESORTS,
+    BAQUEIRA_WEATHER_URL,
     REQUEST_HEADERS,
     BaqueiraSnowScraper,
     merge_baqueira_reports,
     parse_baqueira_snow_report,
+    parse_baqueira_weather_report,
 )
 
 
@@ -106,6 +108,42 @@ class BaqueiraSnowScraperTest(unittest.TestCase):
             follow_redirects=True,
         )
 
+    def test_fetches_weather_page_and_merges_depth_and_avalanche_risk(self) -> None:
+        piste_response = Mock()
+        piste_response.text = """
+        <li class="spolio-block" data-class="access open"></li>
+        <li class="spolio-block" data-class="pista-azul open"></li>
+        """
+        piste_response.raise_for_status.return_value = None
+        weather_response = Mock()
+        weather_response.text = """
+        <section>
+          <div class="col1"><p>Espesores de nieve 30-80 cm</p></div>
+          <div class="col 12"><p>Riesgo de aludes 3/5</p></div>
+        </section>
+        """
+        weather_response.raise_for_status.return_value = None
+        client = Mock()
+        client.get.side_effect = [
+            piste_response,
+            piste_response,
+            piste_response,
+            piste_response,
+            weather_response,
+        ]
+        scraper = BaqueiraSnowScraper(client=client)
+
+        report = scraper.get_current(BAQUEIRA_RESORTS[0])
+
+        self.assertEqual(report.snow_depth_min_cm, 30)
+        self.assertEqual(report.snow_depth_max_cm, 80)
+        self.assertEqual(report.avalanche_risk, 3)
+        client.get.assert_any_call(
+            BAQUEIRA_WEATHER_URL,
+            headers=REQUEST_HEADERS,
+            follow_redirects=True,
+        )
+
     def test_raises_when_pages_do_not_include_extractable_data(self) -> None:
         response = Mock()
         response.text = "<html></html>"
@@ -116,6 +154,18 @@ class BaqueiraSnowScraperTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             scraper.get_current(BAQUEIRA_RESORTS[0])
+
+    def test_parses_weather_depth_and_avalanche_risk(self) -> None:
+        report = parse_baqueira_weather_report(
+            """
+            <div class="col1"><p>Espesores de nieve (cm) 25 - 65 cm</p></div>
+            <div class="col 12"><p>Aludes 2/5</p></div>
+            """
+        )
+
+        self.assertEqual(report.snow_depth_min_cm, 25)
+        self.assertEqual(report.snow_depth_max_cm, 65)
+        self.assertEqual(report.avalanche_risk, 2)
 
 
 if __name__ == "__main__":

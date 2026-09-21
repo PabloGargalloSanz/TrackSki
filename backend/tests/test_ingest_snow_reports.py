@@ -5,12 +5,14 @@ import unittest
 from app.scrapers.snow.aramon import ARAMON_RESORTS
 from app.scrapers.snow.astun_candanchu import ASTUN_CANDANCHU_RESORTS
 from app.scrapers.snow.baqueira import BAQUEIRA_RESORTS
+from app.scrapers.snow.grandvalira import GRANDVALIRA_RESORTS
 from app.commands.ingest_snow_reports import run
 from app.services.snow.models import SnowReportData
 
 
 class IngestSnowReportsTest(unittest.TestCase):
     @patch("app.commands.ingest_snow_reports.create_snow_report_if_missing")
+    @patch("app.commands.ingest_snow_reports.GrandvaliraSnowScraper")
     @patch("app.commands.ingest_snow_reports.BaqueiraSnowScraper")
     @patch("app.commands.ingest_snow_reports.AstunCandanchuSnowScraper")
     @patch("app.commands.ingest_snow_reports.AramonSnowScraper")
@@ -23,6 +25,7 @@ class IngestSnowReportsTest(unittest.TestCase):
         aramon_scraper_class: Mock,
         astun_candanchu_scraper_class: Mock,
         baqueira_scraper_class: Mock,
+        grandvalira_scraper_class: Mock,
         create_snow_report_if_missing: Mock,
     ) -> None:
         db = Mock()
@@ -31,6 +34,7 @@ class IngestSnowReportsTest(unittest.TestCase):
             *ARAMON_RESORTS,
             *ASTUN_CANDANCHU_RESORTS,
             *BAQUEIRA_RESORTS,
+            *GRANDVALIRA_RESORTS,
         ]
         get_resorts.return_value = [
             {
@@ -54,6 +58,9 @@ class IngestSnowReportsTest(unittest.TestCase):
         baqueira_scraper = Mock()
         baqueira_scraper.get_current.return_value = report
         baqueira_scraper_class.return_value = baqueira_scraper
+        grandvalira_scraper = Mock()
+        grandvalira_scraper.get_current.return_value = report
+        grandvalira_scraper_class.return_value = grandvalira_scraper
         create_snow_report_if_missing.return_value = 33
 
         result = run()
@@ -69,6 +76,10 @@ class IngestSnowReportsTest(unittest.TestCase):
         )
         self.assertEqual(baqueira_scraper.get_current.call_count, len(BAQUEIRA_RESORTS))
         self.assertEqual(
+            grandvalira_scraper.get_current.call_count,
+            len(GRANDVALIRA_RESORTS),
+        )
+        self.assertEqual(
             create_snow_report_if_missing.call_count,
             len(configured_resorts),
         )
@@ -81,6 +92,7 @@ class IngestSnowReportsTest(unittest.TestCase):
         aramon_scraper.close.assert_called_once()
         astun_candanchu_scraper.close.assert_called_once()
         baqueira_scraper.close.assert_called_once()
+        grandvalira_scraper.close.assert_called_once()
         db.close.assert_called_once()
 
     @patch("app.commands.ingest_snow_reports.create_snow_report_if_missing")

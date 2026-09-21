@@ -17,6 +17,7 @@ from app.scrapers.snow.astun_candanchu import (
 )
 from app.scrapers.snow.baqueira import BAQUEIRA_RESORTS, BaqueiraSnowScraper
 from app.scrapers.snow.base import SnowScraperResort
+from app.scrapers.snow.grandvalira import GRANDVALIRA_RESORTS, GrandvaliraSnowScraper
 
 
 def scraper_configs():
@@ -24,6 +25,7 @@ def scraper_configs():
         "aramon": (AramonSnowScraper, ARAMON_RESORTS),
         "astun_candanchu": (AstunCandanchuSnowScraper, ASTUN_CANDANCHU_RESORTS),
         "baqueira": (BaqueiraSnowScraper, BAQUEIRA_RESORTS),
+        "grandvalira": (GrandvaliraSnowScraper, GRANDVALIRA_RESORTS),
     }
 
 
@@ -170,7 +172,10 @@ def run(
                         processed=1,
                         inserted=item_inserted,
                         skipped=item_skipped,
-                        metadata={"report_inserted": bool(report_id)},
+                        metadata={
+                            "report_inserted": bool(report_id),
+                            **_snow_report_metadata(report),
+                        },
                         started_at=started_at,
                     )
             finally:
@@ -222,6 +227,35 @@ def _store_snow_audit_run(
         db.commit()
     except Exception:
         db.rollback()
+
+
+def _snow_report_metadata(report) -> dict:
+    return {
+        "open_lifts": report.open_lifts,
+        "total_lifts": report.total_lifts,
+        "open_km": str(report.open_km),
+        "total_km": str(report.total_km),
+        "snow_depth_min_cm": report.snow_depth_min_cm,
+        "snow_depth_max_cm": report.snow_depth_max_cm,
+        "avalanche_risk": report.avalanche_risk,
+        "access_status": report.access_status,
+        "green_trails": {
+            "open": report.green_trails.open,
+            "total": report.green_trails.total,
+        },
+        "blue_trails": {
+            "open": report.blue_trails.open,
+            "total": report.blue_trails.total,
+        },
+        "red_trails": {
+            "open": report.red_trails.open,
+            "total": report.red_trails.total,
+        },
+        "black_trails": {
+            "open": report.black_trails.open,
+            "total": report.black_trails.total,
+        },
+    }
 
 
 if __name__ == "__main__":

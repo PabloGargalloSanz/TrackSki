@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from html.parser import HTMLParser
+import re
+import unicodedata
 
 import httpx
 
@@ -14,6 +17,7 @@ BAQUEIRA_URLS = [
     "https://www.baqueira.es/estado-pistas/Bonaigua",
     "https://www.baqueira.es/estado-pistas/Baciver",
 ]
+BAQUEIRA_WEATHER_URL = "https://www.baqueira.es/meteorologia"
 URL_SEPARATOR = "|"
 REQUEST_HEADERS = {
     "User-Agent": (
@@ -58,6 +62,7 @@ class BaqueiraSnowScraper:
 
     def get_current(self, resort: SnowScraperResort) -> SnowReportData:
         reports = []
+        blocks_by_url = {}
         for url in _resort_urls(resort.url):
             response = self.client.get(
                 url,
@@ -66,13 +71,46 @@ class BaqueiraSnowScraper:
             )
             response.raise_for_status()
             report = parse_baqueira_snow_report(response.text)
+            blocks_by_url[_url_label(url)] = _total_report_blocks(report)
             if _has_baqueira_data(report):
                 reports.append(report)
 
         if not reports:
-            raise ValueError("No se encontraron datos de Baqueira en las paginas descargadas.")
+            diagnostics = ", ".join(
+                f"{label}={blocks}" for label, blocks in blocks_by_url.items()
+            )
+            raise ValueError(
+                "No se encontraron datos de Baqueira en las paginas descargadas"
+                f" ({diagnostics})."
+            )
 
-        return merge_baqueira_reports(reports)
+        report = merge_baqueira_reports(reports)
+
+        weather_response = self.client.get(
+            BAQUEIRA_WEATHER_URL,
+            headers=REQUEST_HEADERS,
+            follow_redirects=True,
+        )
+        weather_response.raise_for_status()
+        weather_data = parse_baqueira_weather_report(weather_response.text)
+
+        return SnowReportData(
+            reported_at=report.reported_at,
+            open_lifts=report.open_lifts,
+            total_lifts=report.total_lifts,
+            open_km=report.open_km,
+            total_km=report.total_km,
+            snow_depth_min_cm=weather_data.snow_depth_min_cm,
+            snow_depth_max_cm=weather_data.snow_depth_max_cm,
+            avalanche_risk=weather_data.avalanche_risk,
+            access_status=report.access_status,
+            green_trails=report.green_trails,
+            blue_trails=report.blue_trails,
+            red_trails=report.red_trails,
+            black_trails=report.black_trails,
+            data_source=SOURCE,
+            is_verified=True,
+        )
 
     def close(self) -> None:
         self.client.close()
@@ -141,6 +179,26 @@ def merge_baqueira_reports(reports: list[SnowReportData]) -> SnowReportData:
         black_trails=_merge_trails([report.black_trails for report in reports]),
         data_source=SOURCE,
         is_verified=True,
+    )
+
+
+@dataclass(frozen=True)
+class BaqueiraWeatherData:
+    snow_depth_min_cm: int | None = None
+    snow_depth_max_cm: int | None = None
+    avalanche_risk: int | None = None
+
+
+def parse_baqueira_weather_report(html: str) -> BaqueiraWeatherData:
+    parser = _TextParser()
+    parser.feed(html)
+    text = " ".join(parser.all_text)
+    snow_depth_min_cm, snow_depth_max_cm = _snow_depth_range(text)
+
+    return BaqueiraWeatherData(
+        snow_depth_min_cm=snow_depth_min_cm,
+        snow_depth_max_cm=snow_depth_max_cm,
+        avalanche_risk=_avalanche_risk(text),
     )
 
 
@@ -241,6 +299,17 @@ def _merge_trails(trails: list[TrailBreakdown]) -> TrailBreakdown:
     )
 
 
+class _TextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.all_text: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        text = " ".join(data.split())
+        if text:
+            self.all_text.append(text)
+
+
 def _has_baqueira_data(report: SnowReportData) -> bool:
     return any(
         [
@@ -254,5 +323,53 @@ def _has_baqueira_data(report: SnowReportData) -> bool:
     )
 
 
+def _total_report_blocks(report: SnowReportData) -> int:
+    return (
+        report.total_lifts
+        + report.green_trails.total
+        + report.blue_trails.total
+        + report.red_trails.total
+        + report.black_trails.total
+    )
+
+
+def _url_label(url: str) -> str:
+    return url.rstrip("/").split("/")[-1] or "estado-pistas"
+
+
 def _resort_urls(url: str) -> list[str]:
     return [current_url.strip() for current_url in url.split(URL_SEPARATOR) if current_url.strip()]
+
+
+def _snow_depth_range(text: str) -> tuple[int | None, int | None]:
+    normalized_text = _normalize_text(text)
+    match = re.search(
+        r"(?:espesor|espesores|nieve).{0,80}?(\d{1,3})(?:\s*[-/]\s*(\d{1,3}))?\s*cm",
+        normalized_text,
+    )
+    if not match:
+        return None, None
+
+    first_depth = int(match.group(1))
+    second_depth = int(match.group(2)) if match.group(2) else first_depth
+    return min(first_depth, second_depth), max(first_depth, second_depth)
+
+
+def _avalanche_risk(text: str) -> int | None:
+    normalized_text = _normalize_text(text)
+    match = re.search(r"\b([1-5])\s*/\s*5\b", normalized_text)
+    if match:
+        return int(match.group(1))
+
+    match = re.search(r"\b(?:alud|aludes|avalancha|avalanchas)\D{0,50}([1-5])\b", normalized_text)
+    if match:
+        return int(match.group(1))
+
+    return None
+
+
+def _normalize_text(value: str) -> str:
+    without_accents = unicodedata.normalize("NFKD", value)
+    return "".join(
+        char for char in without_accents if not unicodedata.combining(char)
+    ).lower()
